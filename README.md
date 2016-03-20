@@ -66,7 +66,7 @@ The existing parser recognizes the following language.
     
     divMul ::= factor { ('*' | '/') factor }
     
-    factor ::= base { '(' args ')' }
+    factor ::= base { '(' [expr {',' expr}] ')' }
     
       Parentheses denote function call.
       For calls, `base` must be a function type with the correct arity.
