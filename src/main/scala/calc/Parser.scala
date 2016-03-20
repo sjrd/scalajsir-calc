@@ -11,13 +11,9 @@ import org.scalajs.core.ir.Position
  *  http://www.lihaoyi.com/fastparse/
  */
 object Parser {
-  def parse(code: String): fastparse.core.Parsed[Tree] = {
-    val sourceFile = new java.net.URI("virtualfile://sourcecode.txt")
-    def indexToPosition(index: Int): Position = {
-      Position(sourceFile, line = 0, column = index)
-    }
-
-    new Syntactic(indexToPosition _).program.parse(code)
+  def parse(code: String,
+      indexToPosition: Int => Position): fastparse.core.Parsed[Tree] = {
+    new Syntactic(indexToPosition).program.parse(code)
   }
 
   // Lexical analysis (for which whitespace is significant)
@@ -50,21 +46,11 @@ object Parser {
     private def kw(n: String): Parser[Unit] =
       n ~ !identCont
 
-    /*val kDef = kw("def")
-    val kDefrec = kw("defrec")
-    val kFun = kw("fun")
     val kLet = kw("let")
-    val kLet_* = kw("let*")
-    val kLetrec = kw("letrec")
-    val kRec = kw("rec")
-    val kBegin = kw("begin")
-    val kCond = kw("cond")
+    val kIn = kw("in")
     val kIf = kw("if")
-    val kAnd = kw("and")
-    val kOr = kw("or")
-    val kNot = kw("not")
-    val kHalt = kw("halt")
-    val kPrim = P("@")*/
+    val kElse = kw("else")
+    val kFun = kw("fun")
   }
 
   // Syntactic analysis (for which whitespace and comments are ignored)
@@ -85,11 +71,37 @@ object Parser {
     val program: Parser[Tree] =
       P("" ~ expr ~ End) // The initial "" allows leading whitespace
 
-    private val expr = P(addSub)
+    private val expr = P(ifThenElse | let | fun | addSub)
 
     private val parens: P[Tree] = P("(" ~/ addSub ~ ")")
 
-    private val factor: P[Tree] = P(literal | identifier | parens)
+    private val base: P[Tree] = P(
+        literal | identifier | parens
+    )
+
+    private val factor: P[Tree] = P(base ~ (Index ~ "(" ~/ args ~ ")").rep).map {
+      case (baseValue, applications) =>
+        (baseValue /: applications) { case (fun, (i, args)) =>
+          Call(fun, args)(i)
+        }
+    }
+
+    private val args: P[List[Tree]] = P(expr.rep(0, ",")).map(_.toList)
+
+    private val let: P[Tree] = P(Index ~ kLet ~/ identifier ~ "=" ~ expr ~ kIn ~/ expr).map {
+      case (i, name, value, body) =>
+        Let(name, value, body)(i)
+    }
+
+    private val fun: P[Tree] = P(Index ~ kFun ~/ "(" ~ identifier.rep(0, ",") ~ ")" ~ "=" ~ "{" ~ expr ~ "}").map {
+      case (i, params, body) =>
+        Closure(params.toList, body)(i)
+    }
+
+    private val call: P[Tree] = P(Index ~ identifier ~ "(" ~/ expr.rep(0, ",")).map {
+      case (i, fun, args) =>
+        Call(fun, args.toList)(i)
+    }
 
     private val divMul: P[Tree] = P(factor ~ (Index ~ CharIn("*/").! ~/ factor).rep).map {
       case (leftMost, ops) =>
@@ -103,6 +115,11 @@ object Parser {
         (leftMost /: ops) { case (lhs, (i, op, rhs)) =>
           BinaryOp(op, lhs, rhs)(i)
         }
+    }
+
+    private val ifThenElse: P[Tree] = P(Index ~ "if" ~/ "(" ~ expr ~ ")" ~ addSub ~ "else" ~ addSub).map {
+      case (i, cond, thenp, elsep) =>
+        If(cond, thenp, elsep)(i)
     }
 
   }

@@ -25,12 +25,20 @@ object Main {
       System.exit(1)
     } else {
       val code = args(0)
-      Parser.parse(code) match {
+
+      val sourceFile = new java.net.URI("virtualfile://sourcecode.txt")
+      def indexToPos(index: Int): ir.Position = {
+        ir.Position(sourceFile, line = 0, column = index)
+      }
+
+      Parser.parse(code, indexToPos _) match {
         case Parsed.Success(tree, _) =>
           compileAndRun(tree)
 
-        case failure =>
-          Console.err.println(failure)
+        case Parsed.Failure(lp, index, _) =>
+          Console.err.println(code)
+          Console.err.println(" " * index + "^")
+          Console.err.println(s"parse error (expected: $lp)")
           System.exit(2)
       }
     }
@@ -85,7 +93,8 @@ object Main {
   private def linkAndRun(irFiles: Seq[VirtualScalaJSIRFile]): Unit = {
     import org.scalajs.core.tools.linker._
 
-    val linker = Linker()
+    val linker = Linker(
+        frontendConfig = frontend.LinkerFrontend.Config().withCheckIR(true))
     val logger = new ScalaConsoleLogger()
 
     val output = WritableMemVirtualJSFile("output.js")
