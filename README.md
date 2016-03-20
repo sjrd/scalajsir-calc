@@ -108,6 +108,11 @@ This repository is a learning tool.
 
 For fun, you are free to expand the language, its parser and its compiler, but it is not expected that you do so.
 
+## Coding style and contributing guide
+
+As this repository is meant as a learning tool for developing Scala.js, it follows the same coding style and contributing guidelines.
+See the master repository at https://github.com/scala-js/scala-js
+
 ## License
 
 The code of this repository is distributed under the MIT license:
