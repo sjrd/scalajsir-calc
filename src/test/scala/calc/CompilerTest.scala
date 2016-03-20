@@ -7,6 +7,11 @@ import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
 
+/** Tests focused on the Compiler.
+ *
+ *  You can add more "whitebox" tests here. A whitebox test checks that the
+ *  compiler precisely emits the Trees we expect from some input.
+ */
 class CompilerTest {
 
   private implicit val DummyPos = ir.Position.NoPosition

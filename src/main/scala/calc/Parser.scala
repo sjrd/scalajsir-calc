@@ -11,9 +11,13 @@ import org.scalajs.core.ir.Position
  *  http://www.lihaoyi.com/fastparse/
  */
 object Parser {
-  def parse(code: String,
-      indexToPosition: Int => Position): fastparse.core.Parsed[Tree] = {
-    new Syntactic(indexToPosition).program.parse(code)
+  def parse(code: String): fastparse.core.Parsed[Tree] = {
+    val sourceFile = new java.net.URI("virtualfile://sourcecode.txt")
+    def indexToPos(index: Int): Position = {
+      Position(sourceFile, line = 0, column = index)
+    }
+
+    new Syntactic(indexToPos _).program.parse(code)
   }
 
   // Lexical analysis (for which whitespace is significant)

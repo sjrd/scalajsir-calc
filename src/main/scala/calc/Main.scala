@@ -9,6 +9,8 @@ import org.scalajs.core.tools.logging._
 import org.scalajs.core.tools.io._
 import org.scalajs.core.tools.jsdep.ResolvedJSDependency
 
+import org.scalajs.jsenv._
+
 /** Main object of the calculator.
  *
  *  You do not need to modify this object at all. Your work is in
@@ -26,12 +28,7 @@ object Main {
     } else {
       val code = args(0)
 
-      val sourceFile = new java.net.URI("virtualfile://sourcecode.txt")
-      def indexToPos(index: Int): ir.Position = {
-        ir.Position(sourceFile, line = 0, column = index)
-      }
-
-      Parser.parse(code, indexToPos _) match {
+      Parser.parse(code) match {
         case Parsed.Success(tree, _) =>
           compileAndRun(tree)
 
@@ -55,72 +52,13 @@ object Main {
       writer.flush()
     }
 
-    linkAndRun(classDef)
-  }
-
-  private def linkAndRun(classDef: ir.Trees.ClassDef): Unit = {
-    // Load the standard library
-    val libraryName = "scalajs-library_2.11-0.6.8.jar"
-    val libraryJarStream = getClass.getResourceAsStream(libraryName)
-    val libraryBytes = try {
-      scala.reflect.io.Streamable.bytes(libraryJarStream)
-    } finally {
-      libraryJarStream.close()
-    }
-    val libraryVirtualFile = {
-      (new MemVirtualBinaryFile(libraryName) with VirtualJarFile)
-        .withContent(libraryBytes)
-        .withVersion(Some(libraryName)) // unique
-    }
-    val cache = (new IRFileCache).newCache
-    val libraryIRFiles = cache.cached(List(
-        IRFileCache.IRContainer.Jar(libraryVirtualFile)))
-
-    // Put the `classDef` in a virtual file
-    val mainIRFile = {
-      new VirtualScalaJSIRFile {
-        def path: String = "main.sjsir"
-        def exists: Boolean = true
-
-        val infoAndTree: (ir.Infos.ClassInfo, ir.Trees.ClassDef) =
-          (ir.Infos.generateClassInfo(classDef), classDef)
-      }
-    }
-
-    linkAndRun(libraryIRFiles :+ mainIRFile)
-  }
-
-  private def linkAndRun(irFiles: Seq[VirtualScalaJSIRFile]): Unit = {
-    import org.scalajs.core.tools.linker._
-
-    val linker = Linker(
-        frontendConfig = frontend.LinkerFrontend.Config().withCheckIR(true))
-    val logger = new ScalaConsoleLogger()
-
-    val output = WritableMemVirtualJSFile("output.js")
-    linker.link(irFiles, output, logger)
+    val linked = Linker.link(classDef, new ScalaConsoleLogger)
 
     // Clearly separate the output of the program from the compiling logs
     println("")
     println("")
 
-    run(output)
+    Runner.run(linked, NullLogger, ConsoleJSConsole)
   }
 
-  private def run(jsFile: VirtualJSFile): Unit = {
-    import org.scalajs.jsenv._
-
-    val jsEnv = new nodejs.NodeJSEnv()
-      .loadLibs(Seq(ResolvedJSDependency.minimal(jsFile)))
-
-    val code =
-      s"""console.log(${Compiler.MainObjectFullName}().main());\n"""
-    val codeFile = (new MemVirtualJSFile("maincode.js"))
-      .withContent(code)
-      .withVersion(Some("maincode.js")) // unique
-
-    val runner = jsEnv.jsRunner(codeFile)
-
-    runner.run(NullLogger, ConsoleJSConsole)
-  }
 }
