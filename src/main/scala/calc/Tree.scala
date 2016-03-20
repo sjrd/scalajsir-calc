@@ -8,5 +8,7 @@ sealed abstract class Tree {
 
 final case class Literal(value: Double)(implicit val pos: Position) extends Tree
 
+final case class Ident(name: String)(implicit val pos: Position) extends Tree
+
 final case class BinaryOp(op: String, lhs: Tree, rhs: Tree)(
     implicit val pos: Position) extends Tree
