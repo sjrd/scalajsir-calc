@@ -19,14 +19,6 @@ import org.scalajs.jsenv.JSConsole
  */
 class RunTest {
 
-  private implicit val DummyPos = ir.Position.NoPosition
-
-  private val MainObjectFullName = Compiler.MainObjectFullName
-  private val MainClassFullName = MainObjectFullName + "$"
-
-  // Could be useful in tests, depending on the trees you generate
-  private val classType = irtpe.ClassType(encodeClassName(MainClassFullName))
-
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
