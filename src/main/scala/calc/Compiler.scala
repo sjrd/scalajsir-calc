@@ -13,6 +13,10 @@ object Compiler {
 
   private final val MainClassFullName = MainObjectFullName + "$"
 
+  import irt.BinaryOp._
+  private final val binaryOpMap = Map("+" -> Double_+, "-" -> Double_-,
+      "*" -> Double_*, "/" -> Double_/)
+
   /** Compile an expression tree into a full `ClassDef`.
    *
    *  You do not need to modify this method.
@@ -70,16 +74,22 @@ object Compiler {
     // TODO
     implicit val pos = tree.pos
 
-    import irt.BinaryOp._
-    val binaryOpMap = Map("+" -> Double_+, "-" -> Double_-, "*" -> Double_*,
-      "/" -> Double_/)
-
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
 
       case BinaryOp(op, rhs, lhs) =>
         irt.BinaryOp(binaryOpMap(op), compileExpr(rhs), compileExpr(lhs))
+
+      case Let(name, value, body) =>
+        val irtId = irt.Ident(name.name)
+        irt.Block(List(
+          irt.VarDef(irtId, irtpe.DoubleType, false, compileExpr(value)),
+          compileExpr(body))
+        )
+
+      case Ident(name) =>
+        irt.VarRef(irt.Ident(name))(irtpe.DoubleType)
 
       case _ =>
         throw new Exception(

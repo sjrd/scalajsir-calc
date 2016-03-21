@@ -43,4 +43,9 @@ class RunTest {
     assertRun(12.2, "6.0 / 3 + 10.2")
     assertRun(-215.68, "0.32 - (23.12 + 12.88) * 6")
   }
+
+  @Test def runLetExpr(): Unit = {
+    assertRun(4.41, "let sum = 2.1 in sum * sum")
+    assertRun(113.0876, "let s = 2.3 in let t = 9.2323 in (t * 12) + s")
+  }
 }

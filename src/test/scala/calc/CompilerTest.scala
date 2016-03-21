@@ -53,4 +53,16 @@ class CompilerTest {
       irt.BinaryOp(Double_+, irt.DoubleLiteral(234), irt.DoubleLiteral(123)),
       BinaryOp("+",Literal(234), Literal(123)))
   }
+
+  @Test def compileLet(): Unit = {
+    import irt.BinaryOp._
+    val idRef = irt.VarRef(irt.Ident("sum"))(irtpe.DoubleType)
+    assertCompile(
+      irt.Block(List(
+        irt.VarDef(irt.Ident("sum"), irtpe.DoubleType, false, irt.DoubleLiteral(2)),
+        irt.BinaryOp(Double_*, idRef, idRef)
+      )),
+      Let(Ident("sum"), Literal(2), BinaryOp("*", Ident("sum"), Ident("sum")))
+    )
+  }
 }
