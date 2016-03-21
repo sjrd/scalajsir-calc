@@ -38,4 +38,9 @@ class RunTest {
     assertRun(54.3, "54.3")
   }
 
+  @Test def runOpBinary(): Unit = {
+    assertRun(13.3, "12.3 + (23.12 - 12) / 11.12")
+    assertRun(12.2, "6.0 / 3 + 10.2")
+    assertRun(-215.68, "0.32 - (23.12 + 12.88) * 6")
+  }
 }

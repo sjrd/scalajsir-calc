@@ -70,9 +70,16 @@ object Compiler {
     // TODO
     implicit val pos = tree.pos
 
+    import irt.BinaryOp._
+    val binaryOpMap = Map("+" -> Double_+, "-" -> Double_-, "*" -> Double_*,
+      "/" -> Double_/)
+
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
+
+      case BinaryOp(op, rhs, lhs) =>
+        irt.BinaryOp(binaryOpMap(op), compileExpr(rhs), compileExpr(lhs))
 
       case _ =>
         throw new Exception(

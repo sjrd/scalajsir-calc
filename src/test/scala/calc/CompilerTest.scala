@@ -47,4 +47,10 @@ class CompilerTest {
     assertCompile(irt.DoubleLiteral(234), Literal(234))
   }
 
+  @Test def compileBinaryOp(): Unit = {
+    import irt.BinaryOp._
+    assertCompile(
+      irt.BinaryOp(Double_+, irt.DoubleLiteral(234), irt.DoubleLiteral(123)),
+      BinaryOp("+",Literal(234), Literal(123)))
+  }
 }
