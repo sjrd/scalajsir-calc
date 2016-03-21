@@ -3,6 +3,7 @@ package calc
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
+import scala.collection.mutable.Map
 
 /** Main compiler.
  *
@@ -61,6 +62,9 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
+  var idToType:Map[String, irtpe.Type] = Map()
+  var idToValue:Map[String, irt.Tree] = Map()
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
@@ -74,8 +78,47 @@ object Compiler {
       case Literal(value) =>
         irt.DoubleLiteral(value)
 
-      case _ =>
-        throw new Exception(
+      case BinaryOp(op, lhs, rhs) => {
+        val jsop = op match {
+          case "+" => irt.BinaryOp.Double_+
+          case "-" => irt.BinaryOp.Double_-
+          case "*" => irt.BinaryOp.Double_*
+          case "/" => irt.BinaryOp.Double_/
+        }
+        irt.BinaryOp(jsop, compileExpr(lhs), compileExpr(rhs))
+      }
+
+      case Let(ident, value, body) => {
+        val jsV = compileExpr(value)
+        val jsIdent = irt.Ident(ident.name)
+        val jsId = irt.VarDef(jsIdent, jsV.tpe, false, jsV)
+        idToType += (ident.name -> jsV.tpe)
+        irt.Block(List(jsId, compileExpr(body)))
+      }
+
+      case Ident(n) => {
+        try {
+          irt.VarRef(irt.Ident(n))(idToType(n))
+        }catch{
+          case e:Exception => throw new Exception(s"The variable ${n} is not in the scope")
+        }
+      }
+
+      case If(cond, thenp, elsep) => {
+        val jsThenp = compileExpr(thenp)
+        val jsElsep = compileExpr(elsep)
+        val jsCond = compileExpr(cond)
+        if (jsCond.tpe != irtpe.DoubleType){
+          throw new Exception("The condition in the conditional statement must be a number")
+        }
+        val finalCond = irt.BinaryOp(irt.BinaryOp.!==, jsCond, irt.DoubleLiteral(0.0))
+        if (jsElsep.tpe != jsElsep.tpe){
+          throw new Exception(s"The then and also phase in the conditional statement must bse same type")
+        }
+        irt.If(finalCond, jsThenp, jsElsep)(jsThenp.tpe)
+      }
+
+      case _ => throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
     }
   }

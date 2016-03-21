@@ -6,6 +6,7 @@ import org.junit.Assert._
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
+import util.Random
 
 import org.scalajs.core.tools.logging._
 
@@ -18,7 +19,7 @@ import org.scalajs.jsenv.JSConsole
  *  result.
  */
 class RunTest {
-
+  val r = Random
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
@@ -36,6 +37,27 @@ class RunTest {
 
   @Test def runLiteral(): Unit = {
     assertRun(54.3, "54.3")
+  }
+
+  @Test def runBinaryOp(): Unit = {
+    for (i <- 1 to 5){
+      val a = r.nextDouble()
+      val b = r.nextDouble()
+      assertRun(a + b, s"${a} + ${b}")
+      assertRun(a - b, s"${a} - ${b}")
+      assertRun(a * b, s"${a} * ${b}")
+      assertRun(a / b, s"${a} / ${b}")
+    }
+  }
+
+  @Test def runLetOp(): Unit = {
+    assertRun(123.321 + 456.654, "let x=123.321 in x+456.654")
+    assertRun(1.5 + 2.0, "let x=1.5 in let y=2.0 in x+y")
+  }
+
+  @Test def runCondOp(): Unit = {
+    assertRun(4.2, "if (0) 1.0 else 4.2")
+    assertRun(2.4, "if (1) 2.4 else 0.0")
   }
 
 }
