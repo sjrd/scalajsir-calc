@@ -3,7 +3,7 @@ package calc
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
-import scala.collection.mutable.Map
+import scala.collection.immutable.Map
 
 /** Main compiler.
  *
@@ -14,6 +14,9 @@ object Compiler {
 
   private final val MainClassFullName = MainObjectFullName + "$"
 
+  implicit val defaultEnv = Map[String, irt.Tree] ()
+  implicit val defaultTypeEnv = Map[String, irtpe.Type]()
+  implicit val defaultParams = Set[String]()
   /** Compile an expression tree into a full `ClassDef`.
    *
    *  You do not need to modify this method.
@@ -34,7 +37,6 @@ object Compiler {
                 irtpe.NoType),
             irt.StoreModule(classType, irt.This()(classType)))))(
         irt.OptimizerHints.empty, None)
-
     val body = compileExpr(tree)
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
@@ -62,8 +64,6 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
-  var idToType:Map[String, irtpe.Type] = Map()
-  var idToValue:Map[String, irt.Tree] = Map()
 
 
   def findCapture(tree: Tree): Set[String] = {
@@ -78,11 +78,11 @@ object Compiler {
     }
   }
 
-  def compileClosure(tree: Closure, ident: String): irt.Tree ={
+  def compileClosure(tree: Closure, ident: String)(implicit env:Map[String, irt.Tree],typeEnv:Map[String, irtpe.Type]): irt.Tree ={
     val captureSet = findCapture(tree) - ident
-    val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s)(tree.pos), idToType(s), false, false)(tree.pos)).toList
+    val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s)(tree.pos), typeEnv(s), false, false)(tree.pos)).toList
     val params = tree.params.map(s => irt.ParamDef(irt.Ident(s.name)(tree.pos), irtpe.AnyType, false, false)(tree.pos))
-    irt.Closure(captureParam, params, compileExpr(tree.body), captureSet.map(s => idToValue(s)).toList)(tree.pos)
+    irt.Closure(captureParam, params, compileExpr(tree.body)(env, typeEnv), captureSet.map(s => env(s)).toList)(tree.pos)
   }
 
 
@@ -91,7 +91,7 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree): irt.Tree = {
+  def compileExpr(tree: Tree)(implicit env:Map[String, irt.Tree],typeEnv:Map[String, irtpe.Type]): irt.Tree = {
     // TODO
     implicit val pos = tree.pos
 
@@ -106,25 +106,24 @@ object Compiler {
           case "*" => irt.BinaryOp.Double_*
           case "/" => irt.BinaryOp.Double_/
         }
-        irt.BinaryOp(jsop, irt.Unbox(compileExpr(lhs),'D'), irt.Unbox(compileExpr(rhs), 'D'))
+        irt.BinaryOp(jsop, irt.Unbox(compileExpr(lhs)(env, typeEnv),'D'), irt.Unbox(compileExpr(rhs)(env, typeEnv),'D'))
       }
 
       case Let(ident, value, body) => {
-        var jsV:irt.Tree = if (value.isInstanceOf[Closure]){
-          compileClosure(value.asInstanceOf[Closure], ident.name)
+        /*var jsV:irt.Tree = if (value.isInstanceOf[Closure]){
+          compileClosure(value.asInstanceOf[Closure], ident.name)(env, typeEnv)
         } else{
-          compileExpr(value)
-        }
+          compileExpr(value)(env, typeEnv)
+        }*/
+        val jsV = compileExpr(value)(env, typeEnv)
         val jsIdent = irt.Ident(ident.name)
         val jsId = irt.VarDef(jsIdent, jsV.tpe, false, jsV)
-        idToType += (ident.name -> jsV.tpe)
-        idToValue += (ident.name -> jsV)
-        irt.Block(List(jsId, compileExpr(body)))
+        irt.Block(List(jsId, compileExpr(body)(env+(ident.name -> jsV), typeEnv+(ident.name -> jsV.tpe))))
       }
 
       case Ident(n) => {
         try {
-          irt.VarRef(irt.Ident(n))(idToType(n))
+          irt.VarRef(irt.Ident(n))(typeEnv(n))
         }catch{
           case e:Exception => irt.VarRef(irt.Ident(n))(irtpe.AnyType)
           //throw new Exception(s"The variable ${n} is not in the scope")
@@ -132,9 +131,9 @@ object Compiler {
       }
 
       case If(cond, thenp, elsep) => {
-        val jsThenp = compileExpr(thenp)
-        val jsElsep = compileExpr(elsep)
-        val jsCond = compileExpr(cond)
+        val jsThenp = compileExpr(thenp)(env, typeEnv)
+        val jsElsep = compileExpr(elsep)(env, typeEnv)
+        val jsCond = compileExpr(cond)(env, typeEnv)
         val finalCond = irt.BinaryOp(irt.BinaryOp.!==, irt.Unbox(jsCond,'D'), irt.DoubleLiteral(0.0))
         if (jsElsep.tpe != jsElsep.tpe){
           throw new Exception(s"The then and also phase in the conditional statement must bse same type")
@@ -148,20 +147,20 @@ object Compiler {
           case _ => throw new Exception("Function def error!")
         })*/
         val captureSet = findCapture(tree)
-        val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s), idToType(s), false, false)).toList
+        val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s), typeEnv(s), false, false)).toList
         val params = idList.map(s => irt.ParamDef(irt.Ident(s.name), irtpe.AnyType, false, false))
-        irt.Closure(captureParam, params, compileExpr(body), captureSet.map(s => idToValue(s)).toList)
+        irt.Closure(captureParam, params, compileExpr(body)(env, typeEnv), captureSet.map(s => env(s)).toList)
       }
 
       case Call(f, args) => {
-        val jsFunction = compileExpr(f)
+        val jsFunction = compileExpr(f)(env, typeEnv)
         /*val jsClass = irt.GetClass(jsFunction)
         val fName = f match {
           case Ident(n) => n
           case _ => throw new Exception("TO")
         }*/
         //irt.Apply(irt.This()(irtpe.ClassType(MainClassFullName)), irt.Ident(fName), args.map(s => compileExpr(s)))(irtpe.DoubleType)
-        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s))),'D')
+        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s)(env, typeEnv))),'D')
       }
 
 

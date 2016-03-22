@@ -35,6 +35,8 @@ class CompilerTest {
       ir.Hashers.hashMethodDef(methodDef).hash.get
     }
 
+    implicit val defaultEnv = Map[String, irt.Tree] ()
+    implicit val defaultTypeEnv = Map[String, irtpe.Type]()
     val expectedHash = hashOf(expected)
     val actual = Compiler.compileExpr(sourceTree)
     val actualHash = hashOf(actual)

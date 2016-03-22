@@ -73,6 +73,13 @@ class RunTest {
     testCapture("let f=fun (g) = {g (x)} in f (y)", Set("x", "y"))
     testCapture("fun (x) = {x + 1}", Set())
     testCapture("let fac = fun (x) = {if (x) x*fac(x-1) else 1} in fac(5)", Set())
+    testCapture("let x=1 in let f=fun(y)={y+x} in f(1)", Set())
+    testCapture("let f=fun(y)={y+x} in f(1)", Set("x"))
+  }
+
+  @Test def runFunAndCall(): Unit = {
+    assertRun(2.5, "let x=1 in let f=fun(y)={y+x} in f(1.5)")
+    assertRun(2.5, "let f=fun(g)={g(1.0)} in let g=fun(x)={x+1.5} in f(g)")
   }
 
 
