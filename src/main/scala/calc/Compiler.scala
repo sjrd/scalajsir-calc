@@ -65,6 +65,27 @@ object Compiler {
   var idToType:Map[String, irtpe.Type] = Map()
   var idToValue:Map[String, irt.Tree] = Map()
 
+
+  def findCapture(tree: Tree): Set[String] = {
+    tree match {
+      case _:Literal => Set()
+      case BinaryOp(_, l, r) => findCapture(l) ++ findCapture(r)
+      case Let(i, v, body) => findCapture(body) ++ findCapture(v) - i.name
+      case Ident(n) => Set(n)
+      case If(cond, thenp, elsep) => findCapture(cond) ++ findCapture(thenp) ++ findCapture(elsep)
+      case Closure(idents, body) => findCapture(body) -- idents.toSet.flatMap((x:Tree) => findCapture(x))
+      case Call(f, args) => findCapture(f) ++ args.toSet.flatMap((x:Tree) => findCapture(x))
+    }
+  }
+
+  def compileClosure(tree: Closure, ident: String): irt.Tree ={
+    val captureSet = findCapture(tree) - ident
+    val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s)(tree.pos), idToType(s), false, false)(tree.pos)).toList
+    val params = tree.params.map(s => irt.ParamDef(irt.Ident(s.name)(tree.pos), irtpe.AnyType, false, false)(tree.pos))
+    irt.Closure(captureParam, params, compileExpr(tree.body), captureSet.map(s => idToValue(s)).toList)(tree.pos)
+  }
+
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
@@ -85,14 +106,19 @@ object Compiler {
           case "*" => irt.BinaryOp.Double_*
           case "/" => irt.BinaryOp.Double_/
         }
-        irt.BinaryOp(jsop, compileExpr(lhs), compileExpr(rhs))
+        irt.BinaryOp(jsop, irt.Unbox(compileExpr(lhs),'D'), irt.Unbox(compileExpr(rhs), 'D'))
       }
 
       case Let(ident, value, body) => {
-        val jsV = compileExpr(value)
+        var jsV:irt.Tree = if (value.isInstanceOf[Closure]){
+          compileClosure(value.asInstanceOf[Closure], ident.name)
+        } else{
+          compileExpr(value)
+        }
         val jsIdent = irt.Ident(ident.name)
         val jsId = irt.VarDef(jsIdent, jsV.tpe, false, jsV)
         idToType += (ident.name -> jsV.tpe)
+        idToValue += (ident.name -> jsV)
         irt.Block(List(jsId, compileExpr(body)))
       }
 
@@ -100,7 +126,8 @@ object Compiler {
         try {
           irt.VarRef(irt.Ident(n))(idToType(n))
         }catch{
-          case e:Exception => throw new Exception(s"The variable ${n} is not in the scope")
+          case e:Exception => irt.VarRef(irt.Ident(n))(irtpe.AnyType)
+          //throw new Exception(s"The variable ${n} is not in the scope")
         }
       }
 
@@ -108,15 +135,35 @@ object Compiler {
         val jsThenp = compileExpr(thenp)
         val jsElsep = compileExpr(elsep)
         val jsCond = compileExpr(cond)
-        if (jsCond.tpe != irtpe.DoubleType){
-          throw new Exception("The condition in the conditional statement must be a number")
-        }
-        val finalCond = irt.BinaryOp(irt.BinaryOp.!==, jsCond, irt.DoubleLiteral(0.0))
+        val finalCond = irt.BinaryOp(irt.BinaryOp.!==, irt.Unbox(jsCond,'D'), irt.DoubleLiteral(0.0))
         if (jsElsep.tpe != jsElsep.tpe){
           throw new Exception(s"The then and also phase in the conditional statement must bse same type")
         }
         irt.If(finalCond, jsThenp, jsElsep)(jsThenp.tpe)
       }
+
+      case Closure(idList, body) => {
+        /*val capturePara = idList.map(s => s match{
+          case Ident(n) => irt.ParamDef(irt.Ident(n), irtpe.AnyType, false, false)
+          case _ => throw new Exception("Function def error!")
+        })*/
+        val captureSet = findCapture(tree)
+        val captureParam = captureSet.map(s => irt.ParamDef(irt.Ident(s), idToType(s), false, false)).toList
+        val params = idList.map(s => irt.ParamDef(irt.Ident(s.name), irtpe.AnyType, false, false))
+        irt.Closure(captureParam, params, compileExpr(body), captureSet.map(s => idToValue(s)).toList)
+      }
+
+      case Call(f, args) => {
+        val jsFunction = compileExpr(f)
+        /*val jsClass = irt.GetClass(jsFunction)
+        val fName = f match {
+          case Ident(n) => n
+          case _ => throw new Exception("TO")
+        }*/
+        //irt.Apply(irt.This()(irtpe.ClassType(MainClassFullName)), irt.Ident(fName), args.map(s => compileExpr(s)))(irtpe.DoubleType)
+        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s))),'D')
+      }
+
 
       case _ => throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
