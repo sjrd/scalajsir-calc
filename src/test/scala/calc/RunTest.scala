@@ -65,4 +65,17 @@ class RunTest {
     assertRun(8, "(2 + 2) * 2")
   }
 
+  // ----------- Let bindings ------------
+  @Test def runSimpleLet(): Unit = {
+    assertRun(9, "let x = 4 in x + 5")
+  }
+
+  @Test def runNestedLet(): Unit = {
+    assertRun(9, "let x = 4 in let y = 5 in x + y")
+  }
+
+  @Test def runShadowingLet(): Unit = {
+    assertRun(5, "let x = 4 in let x = 5 in x")
+  }
+
 }

@@ -11,6 +11,8 @@ import ir.Definitions._
 object Compiler {
   final val MainObjectFullName = "main.Main"
 
+  type Scope = Map[String, Tree]
+
   private final val MainClassFullName = MainObjectFullName + "$"
 
   /** Compile an expression tree into a full `ClassDef`.
@@ -76,7 +78,7 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree): irt.Tree = {
+  def compileExpr(tree: Tree, scope: Scope=Map.empty[String, Tree]): irt.Tree = {
     // TODO
     implicit val pos = tree.pos
 
@@ -84,8 +86,16 @@ object Compiler {
       case Literal(value) =>
         irt.DoubleLiteral(value)
 
+      case Ident(name) => scope.get(name) match {
+        case Some(t) => compileExpr(t, scope)
+        case None    => throw new Exception(s"Not in scope: ${name}")
+      }
+
       case BinaryOp(op, lhs, rhs) =>
-        irt.BinaryOp(parseBinOp(op), compileExpr(lhs), compileExpr(rhs))
+        irt.BinaryOp(parseBinOp(op), compileExpr(lhs, scope), compileExpr(rhs, scope))
+
+      case Let(ident, value, body) =>
+        compileExpr(body, scope + (ident.name -> value))
 
       case _ =>
         throw new Exception(
