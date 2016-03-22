@@ -6,6 +6,7 @@ import org.junit.Assert._
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
+import irt.BinaryOp._
 
 /** Tests focused on the Compiler.
  *
@@ -48,21 +49,29 @@ class CompilerTest {
   }
 
   @Test def compileBinaryOp(): Unit = {
-    import irt.BinaryOp._
     assertCompile(
       irt.BinaryOp(Double_+, irt.DoubleLiteral(234), irt.DoubleLiteral(123)),
       BinaryOp("+",Literal(234), Literal(123)))
   }
 
   @Test def compileLet(): Unit = {
-    import irt.BinaryOp._
     val idRef = irt.VarRef(irt.Ident("sum"))(irtpe.DoubleType)
+
     assertCompile(
       irt.Block(List(
         irt.VarDef(irt.Ident("sum"), irtpe.DoubleType, false, irt.DoubleLiteral(2)),
-        irt.BinaryOp(Double_*, idRef, idRef)
-      )),
+        irt.BinaryOp(Double_*, idRef, idRef))
+      ),
       Let(Ident("sum"), Literal(2), BinaryOp("*", Ident("sum"), Ident("sum")))
     )
   }
+
+  @Test def compileIfElse(): Unit = {
+    val cond = irt.BinaryOp(Double_-, irt.DoubleLiteral(2), irt.DoubleLiteral(20))
+    val ifCond = irt.BinaryOp(Num_!=, cond , irt.DoubleLiteral(0))
+
+    assertCompile(
+      irt.If(ifCond, irt.DoubleLiteral(7), irt.DoubleLiteral(53))(irtpe.DoubleType),
+      If(BinaryOp("-",Literal(2),Literal(20)), Literal(7), Literal(53)))
+    }
 }

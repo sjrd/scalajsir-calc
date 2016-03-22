@@ -48,4 +48,9 @@ class RunTest {
     assertRun(4.41, "let sum = 2.1 in sum * sum")
     assertRun(113.0876, "let s = 2.3 in let t = 9.2323 in (t * 12) + s")
   }
+
+  @Test def runIfElse(): Unit = {
+    assertRun(3.1, "if(1) 3.1 else 2.2")
+    assertRun(2.2, "let i = 10 in if(10-i) 123.1 else 2.2")
+  }
 }

@@ -91,6 +91,10 @@ object Compiler {
       case Ident(name) =>
         irt.VarRef(irt.Ident(name))(irtpe.DoubleType)
 
+      case If(cond, thenp, elsep) =>
+        val ifC = irt.BinaryOp(Num_!=, compileExpr(cond), irt.DoubleLiteral(0))
+        irt.If(ifC, compileExpr(thenp), compileExpr(elsep))(irtpe.DoubleType)
+
       case _ =>
         throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
