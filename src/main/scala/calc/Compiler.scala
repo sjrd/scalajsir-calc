@@ -61,6 +61,16 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
+  // translates a string-represented operation into an opcode
+  private def parseBinOp(op: String): irt.BinaryOp.Code = op match {
+    case "+" => irt.BinaryOp.Double_+
+    case "-" => irt.BinaryOp.Double_-
+    case "*" => irt.BinaryOp.Double_*
+    case "/" => irt.BinaryOp.Double_/
+    case "%" => irt.BinaryOp.Double_%
+    case _   => throw new Exception(s"Unsupported binary operation: $op")
+  }
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
@@ -73,6 +83,9 @@ object Compiler {
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
+
+      case BinaryOp(op, lhs, rhs) =>
+        irt.BinaryOp(parseBinOp(op), compileExpr(lhs), compileExpr(rhs))
 
       case _ =>
         throw new Exception(

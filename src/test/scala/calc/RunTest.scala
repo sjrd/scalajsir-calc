@@ -19,6 +19,8 @@ import org.scalajs.jsenv.JSConsole
  */
 class RunTest {
 
+  private val equalsTolerance: Double = 0.00001
+
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
@@ -31,11 +33,36 @@ class RunTest {
 
     Runner.run(linked, NullLogger, console)
 
-    assertEquals(expected.toString(), lines.toString().trim)
+    assertEquals(expected, lines.toString().trim.toDouble, equalsTolerance)
   }
 
   @Test def runLiteral(): Unit = {
     assertRun(54.3, "54.3")
+  }
+
+  // ---------- Arithmetic ---------------
+  @Test def runSimpleSum(): Unit = {
+    assertRun(10.1, "4.5 + 5.6")
+  }
+
+  @Test def runSimpleSub(): Unit = {
+    assertRun(1.5, "5.5 - 4")
+  }
+
+  @Test def runSimpleMul(): Unit = {
+    assertRun(25.2, "4.5 * 5.6")
+  }
+
+  @Test def runSimpleDiv(): Unit = {
+    assertRun(2, "14.0 / 7.0" )
+  }
+
+  @Test def runPrecedence1(): Unit = {
+    assertRun(6, "2 + 2 * 2")
+  }
+
+  @Test def runPrecedence2(): Unit = {
+    assertRun(8, "(2 + 2) * 2")
   }
 
 }
