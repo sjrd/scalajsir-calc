@@ -1,5 +1,6 @@
 package calc
 
+import calc.Typechecker.TypecheckerException
 import org.junit.Test
 import org.junit.Assert._
 
@@ -76,6 +77,33 @@ class RunTest {
 
   @Test def runShadowingLet(): Unit = {
     assertRun(5, "let x = 4 in let x = 5 in x")
+  }
+
+  // ----------- Error messages ----------
+  @Test(expected = classOf[TypecheckerException]) def runUnboundIdent1(): Unit = {
+    assertRun(0.0, "someid")
+  }
+
+  @Test(expected = classOf[TypecheckerException]) def runUnboundIdent2(): Unit = {
+    assertRun(0.0, "let x = 42 in someid")
+  }
+
+  // ----------- If expressions ----------
+  @Test def runTrueIf(): Unit = {
+    assertRun(42.0, "if (1) 42 else 16")
+  }
+
+  @Test def runFalseIf(): Unit = {
+    assertRun(16.0, "if (0) 42 else 16")
+  }
+
+  // ------- Compound statements ---------
+  @Test def runCompoundIf1(): Unit = {
+    assertRun(42.0, "let x = 42 in if (1) x else 16")
+  }
+
+  @Test def runCompoundIf2(): Unit = {
+    assertRun(58.0, "let x = 42 in if (0) x else x + 16")
   }
 
 }

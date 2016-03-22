@@ -1,7 +1,7 @@
 package calc
 
 import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
+import org.scalajs.core.ir.{Trees => irt, Types => irtpe, Position}
 import ir.Definitions._
 
 /** Main compiler.
@@ -36,7 +36,10 @@ object Compiler {
             irt.StoreModule(classType, irt.This()(classType)))))(
         irt.OptimizerHints.empty, None)
 
-    val body = compileExpr(tree)
+    // typechecking:
+    val typedTree = Typechecker.typecheck(tree)
+
+    val body = compileExpr(typedTree)
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
         irt.OptimizerHints.empty, None)
@@ -63,7 +66,6 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
-  // translates a string-represented operation into an opcode
   private def parseBinOp(op: String): irt.BinaryOp.Code = op match {
     case "+" => irt.BinaryOp.Double_+
     case "-" => irt.BinaryOp.Double_-
@@ -72,6 +74,12 @@ object Compiler {
     case "%" => irt.BinaryOp.Double_%
     case _   => throw new Exception(s"Unsupported binary operation: $op")
   }
+
+  private def evalIfCond(cond: Tree)(implicit pos: Position): irt.BooleanLiteral = cond match {
+    case Literal(v, _) if v != 0 => irt.BooleanLiteral(true)
+    case _                       => irt.BooleanLiteral(false) // this can only be a literal -- checked by TC
+  }
+
 
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
@@ -83,19 +91,25 @@ object Compiler {
     implicit val pos = tree.pos
 
     tree match {
-      case Literal(value) =>
+      case Literal(value, _) =>
         irt.DoubleLiteral(value)
 
-      case Ident(name) => scope.get(name) match {
+      case Ident(name, _) => scope.get(name) match {
         case Some(t) => compileExpr(t, scope)
         case None    => throw new Exception(s"Not in scope: ${name}")
       }
 
-      case BinaryOp(op, lhs, rhs) =>
+      case BinaryOp(op, lhs, rhs, _) =>
         irt.BinaryOp(parseBinOp(op), compileExpr(lhs, scope), compileExpr(rhs, scope))
 
-      case Let(ident, value, body) =>
+      case Let(ident, value, body, _) =>
         compileExpr(body, scope + (ident.name -> value))
+
+      case If(cond, thenp, elsep, tp) =>
+        val condC  = evalIfCond(cond)
+        val thenpC = compileExpr(thenp, scope)
+        val elsepC = compileExpr(elsep, scope)
+        irt.If(condC, thenpC, elsepC)(Typechecker.getScalaJSType(tp))
 
       case _ =>
         throw new Exception(
