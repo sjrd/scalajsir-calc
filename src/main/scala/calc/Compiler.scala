@@ -70,7 +70,7 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree): irt.Tree = {
+  def compileExpr(tree: Tree, listId: List[Ident] = List()): irt.Tree = {
     // TODO
     implicit val pos = tree.pos
 
@@ -79,21 +79,31 @@ object Compiler {
         irt.DoubleLiteral(value)
 
       case BinaryOp(op, rhs, lhs) =>
-        irt.BinaryOp(binaryOpMap(op), compileExpr(rhs), compileExpr(lhs))
+        val right = compileExpr(rhs, listId)
+        val left  = compileExpr(lhs, listId)
+        irt.BinaryOp(binaryOpMap(op), right, left)
 
       case Let(name, value, body) =>
         val irtId = irt.Ident(name.name)
+        val letVal = compileExpr(value, listId)
         irt.Block(List(
-          irt.VarDef(irtId, irtpe.DoubleType, false, compileExpr(value)),
-          compileExpr(body))
+          irt.VarDef(irtId, irtpe.DoubleType, false, letVal),
+          compileExpr(body, name::listId))
         )
 
       case Ident(name) =>
-        irt.VarRef(irt.Ident(name))(irtpe.DoubleType)
+        listId.contains(Ident(name)) match{
+          case true  => irt.VarRef(irt.Ident(name))(irtpe.DoubleType)
+          case false => throw new Exception(s"Identifier ${name} not defined")
+        }
 
       case If(cond, thenp, elsep) =>
-        val ifC = irt.BinaryOp(Num_!=, compileExpr(cond), irt.DoubleLiteral(0))
-        irt.If(ifC, compileExpr(thenp), compileExpr(elsep))(irtpe.DoubleType)
+        val ifVal = compileExpr(cond, listId)
+        irt.If(
+          irt.BinaryOp(Num_!=, ifVal, irt.DoubleLiteral(0)),
+          compileExpr(thenp, listId),
+          compileExpr(elsep, listId)
+        )(irtpe.DoubleType)
 
       case _ =>
         throw new Exception(
