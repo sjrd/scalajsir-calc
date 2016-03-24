@@ -1,4 +1,5 @@
 package calc
+import scala.util.Try
 
 import org.junit.Test
 import org.junit.Assert._
@@ -50,16 +51,20 @@ class RunTest {
   }
 
   @Test def runLetException(): Unit = {
-   try{
+    assertTrue(Try {
       assertRun(4.41, "let sum = 2.1 in s * sum")
-      fail()
-    } catch {
-      case e: Exception =>
-    }
+    }.isFailure)
   }
 
   @Test def runIfElse(): Unit = {
     assertRun(3.1, "if(1) 3.1 else 2.2")
     assertRun(2.2, "let i = 10 in if(10-i) 123.1 else 2.2")
+  }
+
+  @Test def runLambdaNC(): Unit = {
+    assertRun(16.80, "let f = fun (x,y) = {x*y} in 4*f(2.1,2)")
+    assertRun( 3.20, "let f = fun (x) = { if(x) x else 1.1} in f(3.2)")
+    assertRun( 1.10, "let f = fun (x) = { if(x) x else 1.1} in f(0)")
+    assertRun(16.81, "let f=fun(x) = {x*x} in let x = fun(q) = {q+2} in f(x(2.1))")
   }
 }

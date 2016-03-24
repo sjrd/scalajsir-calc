@@ -70,7 +70,7 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree, listId: List[Ident] = List()): irt.Tree = {
+  def compileExpr(tree: Tree, listId: Map[String,irtpe.Type] = Map()): irt.Tree = {
     // TODO
     implicit val pos = tree.pos
 
@@ -87,13 +87,13 @@ object Compiler {
         val irtId = irt.Ident(name.name)
         val letVal = compileExpr(value, listId)
         irt.Block(List(
-          irt.VarDef(irtId, irtpe.DoubleType, false, letVal),
-          compileExpr(body, name::listId))
+          irt.VarDef(irtId, letVal.tpe, false, letVal),
+          compileExpr(body, listId + (name.name -> letVal.tpe)))
         )
 
       case Ident(name) =>
-        listId.contains(Ident(name)) match{
-          case true  => irt.VarRef(irt.Ident(name))(irtpe.DoubleType)
+        listId.contains(name) match {
+          case true  => irt.VarRef(irt.Ident(name))(listId(name))
           case false => throw new Exception(s"Identifier ${name} not defined")
         }
 
@@ -104,6 +104,28 @@ object Compiler {
           compileExpr(thenp, listId),
           compileExpr(elsep, listId)
         )(irtpe.DoubleType)
+
+      case Closure(params, body) =>
+        val typePar = params map ( x => (x.name, irtpe.DoubleType))
+        val listPar = params map { x =>
+                        irt.ParamDef(irt.Ident("_" + x.name), irtpe.AnyType,
+                          false, false)
+                      }
+
+        val stVar = params map { x =>
+                      irt.VarDef(irt.Ident(x.name), irtpe.DoubleType, false,
+                        irt.Unbox(irt.VarRef(irt.Ident("_" + x.name))
+                          (irtpe.AnyType), 'D')
+                      )
+                    }
+
+        val bl = irt.Block(stVar ++ List(compileExpr(body, listId ++ typePar)))
+        irt.Closure(List(), listPar, bl, List())
+
+      case Call(fun , args) =>
+        val argList = args.map(x => compileExpr(x,listId))
+        val callTree = irt.JSFunctionApply(compileExpr(fun, listId), argList)
+        irt.Unbox(callTree,'D')
 
       case _ =>
         throw new Exception(

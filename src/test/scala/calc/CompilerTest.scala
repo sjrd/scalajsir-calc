@@ -73,5 +73,5 @@ class CompilerTest {
     assertCompile(
       irt.If(ifCond, irt.DoubleLiteral(7), irt.DoubleLiteral(53))(irtpe.DoubleType),
       If(BinaryOp("-",Literal(2),Literal(20)), Literal(7), Literal(53)))
-    }
+  }   
 }
