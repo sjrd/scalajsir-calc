@@ -4,6 +4,8 @@ import org.scalajs.core.ir
 import org.scalajs.core.ir.{Trees => irt, Types => irtpe, Position}
 import ir.Definitions._
 
+import calc.Typechecker.getScalaJSType
+
 /** Main compiler.
  *
  *  You have to implement the method `compileExpr`.
@@ -12,6 +14,8 @@ object Compiler {
   final val MainObjectFullName = "main.Main"
 
   type Scope = Map[String, Tree]
+
+  var varDefMap: Map[String, irt.VarDef] = Map.empty[String, irt.VarDef]
 
   private final val MainClassFullName = MainObjectFullName + "$"
 
@@ -40,6 +44,7 @@ object Compiler {
     val typedTree = Typechecker.typecheck(tree)
 
     val body = compileExpr(typedTree)
+
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
         irt.OptimizerHints.empty, None)
@@ -80,6 +85,13 @@ object Compiler {
     case _                       => irt.BooleanLiteral(false) // this can only be a literal -- checked by TC
   }
 
+  private def paramToParamdef(p: Ident)(implicit pos: Position): irt.ParamDef =
+    irt.ParamDef(irt.Ident(p.name), p.tp, mutable = false, rest = false)
+
+  val paramdefToTuple = (p: irt.ParamDef) => (p.name.name, p)
+
+  private def processParams(params: List[Ident])(implicit pos: Position): List[irt.ParamDef] =
+    params map paramToParamdef
 
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
@@ -94,22 +106,30 @@ object Compiler {
       case Literal(value, _) =>
         irt.DoubleLiteral(value)
 
-      case Ident(name, _) => scope.get(name) match {
-        case Some(t) => compileExpr(t, scope)
-        case None    => throw new Exception(s"Not in scope: ${name}")
+      case i@Ident(name, tp) => scope.get(name) match {
+        case Some(t) => irt.VarRef(irt.Ident(name))(tp) // compileExpr(t, scope)
+        case None    => throw new Exception(s"Not in scope: $name")
       }
 
       case BinaryOp(op, lhs, rhs, _) =>
         irt.BinaryOp(parseBinOp(op), compileExpr(lhs, scope), compileExpr(rhs, scope))
 
       case Let(ident, value, body, _) =>
-        compileExpr(body, scope + (ident.name -> value))
+        irt.Block(List(irt.VarDef(
+          irt.Ident(ident.name), ident.tp, mutable = false, compileExpr(value)),
+          compileExpr(body, scope + (ident.name -> value))))
 
       case If(cond, thenp, elsep, tp) =>
         val condC  = evalIfCond(cond)
         val thenpC = compileExpr(thenp, scope)
         val elsepC = compileExpr(elsep, scope)
-        irt.If(condC, thenpC, elsepC)(Typechecker.getScalaJSType(tp))
+        irt.If(condC, thenpC, elsepC)(tp)
+
+      case Closure(params, body, _) =>
+        ???
+
+      case Call(fun, args, _) =>
+        ???
 
       case _ =>
         throw new Exception(

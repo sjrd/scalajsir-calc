@@ -15,20 +15,20 @@ object Typechecker {
 
   type TypeScope = Map[String, TreeType]
 
-  def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
+  implicit def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
     case DoubleType   => irtpe.DoubleType
     case FunctionType => irtpe.NoType     // TODO function type representation
     case NoType       => irtpe.NoType
   }
 
   def getType(tree: Tree, scope: TypeScope)(implicit pos: Position): Tree =  tree match {
-    case Literal(x, _)                  => Literal(x, DoubleType)
-    case b@BinaryOp(_, _, _, _)         => checkBinop(b, scope)
-    case id@Ident(name, _)              => checkIdent(name, scope)
-    case let@Let(ident, value, body, _) => checkLet(let, scope)
-    case ifExpr@If(_, _, _, _)          => checkIf(ifExpr, scope)
-    case Call(fun, args, _)             => ??? // TODO, should infer parameter types
-    case Closure(params, body, _)       => ??? // TODO, parameter types
+    case Literal(x, _)          => Literal(x, DoubleType)
+    case b@BinaryOp(_, _, _, _) => checkBinop(b, scope)
+    case id@Ident(name, _)      => checkIdent(name, scope)
+    case let@Let(_, _, _, _)    => checkLet(let, scope)
+    case ifExpr@If(_, _, _, _)  => checkIf(ifExpr, scope)
+    case call@Call(_, _, _)     => checkCall(call, scope)
+    case cl@Closure(_, _, _)    => checkClosure(cl, scope)
   }
 
   def typecheck(tree: Tree)(implicit pos: Position): Tree = {
@@ -71,14 +71,19 @@ object Typechecker {
     letExpr match {
       case Let(ident, value, body, _) =>
         val valueTyped = getType(value, scope)
-        val bodyTyped = getType(body, updateScope(ident.name, valueTyped, scope))
-        Let(ident, valueTyped, bodyTyped, bodyTyped.tp)
+        val identTyped = Ident(ident.name, valueTyped.tp)
+        val bodyTyped  = getType(body, updateScope(ident.name, valueTyped, scope))
+        Let(identTyped, valueTyped, bodyTyped, bodyTyped.tp)
     }
 
   private def updateScope(name: String, value: Tree, scope: TypeScope)(implicit pos: Position): TypeScope = {
     val valType = getType(value, scope).tp
     scope + (name -> valType)
   }
+
+  private def checkCall(call: Call, scope: TypeScope): Tree = ???
+
+  private def checkClosure(cl: Closure, scope: TypeScope): Tree = ???
 
   private def formatError(pos: Position, msg: String): String =
     s"Error at line ${pos.line}, column ${pos.column}: " + msg
