@@ -1,8 +1,64 @@
 package calc
 
 import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
+import ir.{Position, Trees => irt, Types => irtpe}
 import ir.Definitions._
+
+sealed trait CompileError extends Throwable
+case class Unexpected(pos: Position, unexpected: Tree, expected: String)
+  extends CompileError {
+  override def toString(): String = {
+    s"""
+      | At line ${pos.line}, column ${pos.column}
+      | Unexpected $unexpected, expected $expected"
+    """.stripMargin
+  }
+}
+case class TypeError(pos: Position, expected: irtpe.Type, got: irtpe.Type)
+  extends CompileError {
+  override def toString(): String = {
+    s"""
+       | At line ${pos.line}, column ${pos.column}
+       | Expected type $expected, got $got
+      """.stripMargin
+  }
+}
+case class UnknownOperator(pos: Position, op: String) extends CompileError {
+  override def toString(): String = {
+    s"""
+       | At line ${pos.line}, column ${pos.column}
+       | Unknown operator '$op'
+      """.stripMargin
+  }
+}
+
+object NodeCompiler {
+  def apply(f: Tree => irt.Tree): NodeCompiler = {
+    new NodeCompiler {
+      def apply(tree: Tree): irt.Tree = {
+        f(tree)
+      }
+    }
+  }
+}
+
+trait NodeCompiler extends (Tree => irt.Tree) {
+  def apply(tree: Tree): irt.Tree
+
+  def |(other: NodeCompiler): NodeCompiler = {
+    val that = this
+    return new NodeCompiler {
+      def apply(tree: Tree): irt.Tree = {
+        try {
+          that(tree)
+        } catch {
+          case e: CompileError => other(tree)
+          case other: Throwable => throw other
+        }
+      }
+    }
+  }
+}
 
 /** Main compiler.
  *
@@ -10,7 +66,6 @@ import ir.Definitions._
  */
 object Compiler {
   final val MainObjectFullName = "main.Main"
-
   private final val MainClassFullName = MainObjectFullName + "$"
 
   /** Compile an expression tree into a full `ClassDef`.
@@ -61,22 +116,41 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
+  def expr: NodeCompiler = literal | binaryOp
+
+  def literal = NodeCompiler { (t: Tree) => implicit val pos = t.pos
+    t match {
+      case Literal(value) => irt.DoubleLiteral(value)
+      case other => throw Unexpected(pos, other, "double literal")
+    }
+  }
+
+  private def operatorToIR(op: String) = {
+    op match {
+      case "+" => Some(irt.BinaryOp.Double_+)
+      case "-" => Some(irt.BinaryOp.Double_-)
+      case _ => None
+    }
+  }
+
+  def binaryOp = NodeCompiler { (t: Tree) => implicit val pos = t.pos
+    t match {
+      case BinaryOp(op, lhs, rhs) => {
+        val irOp = operatorToIR(op) getOrElse (throw UnknownOperator(pos, op))
+        irt.JSBinaryOp(irOp, expr(lhs), expr(rhs))
+      }
+      case other => throw Unexpected(pos, other, "expression")
+    }
+  }
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
    *  This is the main method you have to implement.
    */
   def compileExpr(tree: Tree): irt.Tree = {
-    // TODO
     implicit val pos = tree.pos
-
-    tree match {
-      case Literal(value) =>
-        irt.DoubleLiteral(value)
-
-      case _ =>
-        throw new Exception(
-            s"Cannot yet compile a tree of class ${tree.getClass}")
-    }
+    expr(tree)
   }
 }
+
