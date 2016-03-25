@@ -42,8 +42,10 @@ object Compiler {
 
     // typechecking:
     val typedTree = Typechecker.typecheck(tree)
+    println(s"After typechecking: $typedTree")
 
     val body = compileExpr(typedTree)
+    println(s"After compilation: $body")
 
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(

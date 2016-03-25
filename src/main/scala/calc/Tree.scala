@@ -4,7 +4,7 @@ import org.scalajs.core.ir.Position
 
 sealed trait TreeType
 case object DoubleType extends TreeType
-case object FunctionType extends TreeType
+case class FunctionType(arity: Int) extends TreeType
 case object NoType extends TreeType
 
 sealed abstract class Tree {

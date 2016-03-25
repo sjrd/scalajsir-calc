@@ -16,9 +16,9 @@ object Typechecker {
   type TypeScope = Map[String, TreeType]
 
   implicit def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
-    case DoubleType   => irtpe.DoubleType
-    case FunctionType => irtpe.NoType     // TODO function type representation
-    case NoType       => irtpe.NoType
+    case DoubleType      => irtpe.DoubleType
+    case FunctionType(_) => irtpe.NoType     // TODO function type representation
+    case NoType          => irtpe.NoType
   }
 
   def getType(tree: Tree, scope: TypeScope)(implicit pos: Position): Tree =  tree match {
@@ -81,9 +81,34 @@ object Typechecker {
     scope + (name -> valType)
   }
 
-  private def checkCall(call: Call, scope: TypeScope): Tree = ???
+  private def checkCall(call: Call, scope: TypeScope)(implicit pos: Position): Tree = call match {
+    case Call(fun, args, _) => fun match {
+      case Ident(fname, _) =>
+        val argsTyped = args.map (getType (_, scope) )
+        // check if function is in scope:
+        val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
+        // check if all args are numbers:
+        if (argsTyped.exists(a => a.tp != DoubleType)) fail(pos, s"Argument of non-number type.")
+        // check if the arity is right:
+        ftype match {
+          case FunctionType(arity) if arity == args.length => Call(getType(fun, scope), argsTyped, DoubleType)
+          case FunctionType(arity) => fail(pos, s"Function of $arity arguments called with ${args.length} arguments.")
+          case _ => fail(pos, s"Trying to call a non-function object.")
+        }
 
-  private def checkClosure(cl: Closure, scope: TypeScope): Tree = ???
+      case _ =>
+        fail(pos, s"Trying to call a non-function object 2.")
+      }
+  }
+
+  private def checkClosure(cl: Closure, scope: TypeScope)(implicit pos: Position): Tree = cl match {
+    case Closure(params, body, _) =>
+      val paramTypes = (1 to params.length).map(_ => DoubleType)
+      val paramNames = params.map(p => p.name)
+      val paramsMap: TypeScope = paramNames.zip(paramTypes).toMap
+      val paramsTyped = params.map(p => Ident(p.name, DoubleType))
+      Closure(paramsTyped, getType(body, scope ++ paramsMap), FunctionType(params.length))
+  }
 
   private def formatError(pos: Position, msg: String): String =
     s"Error at line ${pos.line}, column ${pos.column}: " + msg
