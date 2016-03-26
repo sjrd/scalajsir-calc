@@ -62,8 +62,9 @@ class RunTest {
 
 
   @Test def runFunAndCall(): Unit = {
+    assertRun(2.5, "let x=1 in x+1.5")
     assertRun(2.5, "let x=1 in let f=fun(y)={y+x} in f(1.5)")
-    assertRun(2.5, "let f=fun(g)={g(1.0)} in let g=fun(x)={x+1.5} in f(g)")
+    assertRun(2.5, "let x=1 in let y=1.5 in let f=fun(x,y)={y+x} in f(x,y)")
   }
 
 

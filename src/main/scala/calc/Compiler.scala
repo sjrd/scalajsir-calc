@@ -85,20 +85,20 @@ object Compiler {
     "generated_"+seed.toString
   }
 
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
    *  This is the main method you have to implement.
    */
   def compileExpr(tree: Tree)(env:Map[String, irt.Tree] = Map(),typeEnv:Map[String, irtpe.Type] = Map()): irt.Tree = {
-    // TODO
     implicit val pos = tree.pos
 
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
 
-      case BinaryOp(op, lhs, rhs) => {
+      case BinaryOp(op, lhs, rhs) =>
         val jsop = op match {
           case "+" => irt.BinaryOp.Double_+
           case "-" => irt.BinaryOp.Double_-
@@ -106,27 +106,21 @@ object Compiler {
           case "/" => irt.BinaryOp.Double_/
         }
         irt.BinaryOp(jsop, compileExpr(lhs)(env, typeEnv), compileExpr(rhs)(env, typeEnv))
-      }
 
-      case Let(ident, value, body) => {
+      case Let(ident, value, body) =>
         val jsV = compileExpr(value)(env, typeEnv)
         val jsIdent = irt.Ident(ident.name)
-        val jsId = irt.VarDef(jsIdent, jsV.tpe, false, jsV)
-        irt.Block(List(jsId, compileExpr(body)(env+(ident.name -> jsV), typeEnv+(ident.name -> jsV.tpe))))
-      }
+        val jsId = irt.VarDef(jsIdent, jsV.tpe, mutable = false, jsV)
+        irt.Block(List(jsId, compileExpr(body)(env + (ident.name -> jsV), typeEnv + (ident.name -> jsV.tpe))))
 
-      case Ident(n) => {
+      case Ident(n) =>
         try {
-          typeEnv(n) match {
-            case irtpe.DoubleType => irt.Unbox(irt.VarRef(irt.Ident(n))(typeEnv(n)),'D')
-            case _ => irt.VarRef(irt.Ident(n))(typeEnv(n))
-          }
+          irt.VarRef(irt.Ident(n))(typeEnv(n))
         }catch{
-          case e:Exception => irt.VarRef(irt.Ident(n)) (irtpe.DoubleType)
+          case e:Exception => throw new Exception("No such identity!")
         }
-      }
 
-      case If(cond, thenp, elsep) => {
+      case If(cond, thenp, elsep) =>
         val jsThenp = compileExpr(thenp)(env, typeEnv)
         val jsElsep = compileExpr(elsep)(env, typeEnv)
         val jsCond = compileExpr(cond)(env, typeEnv)
@@ -135,21 +129,23 @@ object Compiler {
           throw new Exception(s"The then and also phase in the conditional statement must bse same type")
         }
         irt.If(finalCond, jsThenp, jsElsep)(jsThenp.tpe)
-      }
 
-      case Closure(idList, body) => {
+      case Closure(idList, body) =>
         val captureList = findCapture(tree).toList
-        val captureParam = captureList.map(s => irt.ParamDef(irt.Ident(s), typeEnv(s), false, false))
-        val params = idList.map(s => irt.ParamDef(irt.Ident(s.name), irtpe.AnyType, false, false))
-        val newTypeEnv = idList.foldLeft(typeEnv) ((env:Map[String,irtpe.Type], s:Ident) => env+(s.name -> irtpe.DoubleType))
-        irt.Closure(captureParam, params, compileExpr(body)(env,newTypeEnv), captureList.map(s => env(s)))
-      }
+        val captureParam = captureList.map(s =>
+          irt.ParamDef(irt.Ident(s), typeEnv(s), mutable = false, rest = false))
+        val params = idList.map(s =>
+          irt.ParamDef(irt.Ident("$$"+s.name), irtpe.AnyType, mutable = false, rest = false))
+        val newTypeEnv = idList.foldLeft(typeEnv)((env: Map[String, irtpe.Type], s:Ident) => env+(s.name -> irtpe.DoubleType))
+        val unboxParams = idList.map(s =>
+          irt.VarDef(irt.Ident(s.name), irtpe.DoubleType, mutable = false,
+            irt.Unbox(irt.VarRef(irt.Ident("$$"+s.name))(irtpe.AnyType), 'D')))
+        val bl = irt.Block(unboxParams ++ List(compileExpr(body)(env, newTypeEnv)))
+        irt.Closure(captureParam, params, bl, captureList.map(s => env(s)))
 
-      case Call(f, args) => {
+      case Call(f, args) =>
         val jsFunction = compileExpr(f)(env, typeEnv)
-        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => irt.Unbox(compileExpr(s)(env, typeEnv),'D'))),'D')
-      }
-
+        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s)(env, typeEnv))), 'D')
 
       case _ => throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
