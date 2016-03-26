@@ -65,6 +65,14 @@ class RunTest {
     assertRun(16.80, "let f = fun (x,y) = {x*y} in 4*f(2.1,2)")
     assertRun( 3.20, "let f = fun (x) = { if(x) x else 1.1} in f(3.2)")
     assertRun( 1.10, "let f = fun (x) = { if(x) x else 1.1} in f(0)")
-    assertRun(16.81, "let f=fun(x) = {x*x} in let x = fun(q) = {q+2} in f(x(2.1))")
+    assertRun(16.81, "let f=fun(x)={x*x} in let x =fun(q) ={q+2} in f(x(2.1))")
+  }
+
+  @Test def runLambdaCaptures(): Unit = {
+    assertRun(4.2,  "let k = 2 in let f = fun(x) = {k*x} in f(2.1)")
+    assertRun(8.2,  "let d = fun(x) = {2 * x} in "+
+                    "let addDouble = fun(x,y) = {d(x) + d(y)} in "+
+                    "addDouble(2.1,2)"
+              )
   }
 }

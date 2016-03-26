@@ -106,21 +106,27 @@ object Compiler {
         )(irtpe.DoubleType)
 
       case Closure(params, body) =>
-        val typePar = params map ( x => (x.name, irtpe.DoubleType))
+        //Argument unboxing at the start of the function
         val listPar = params map { x =>
                         irt.ParamDef(irt.Ident("_" + x.name), irtpe.AnyType,
                           false, false)
                       }
-
         val stVar = params map { x =>
                       irt.VarDef(irt.Ident(x.name), irtpe.DoubleType, false,
                         irt.Unbox(irt.VarRef(irt.Ident("_" + x.name))
                           (irtpe.AnyType), 'D')
                       )
                     }
-
+        //For the capture list
+        val capList = listId.toList
+        val capDef = capList.map { case (x,y) => irt.ParamDef(irt.Ident(x), y,
+          false, false)}
+        val capVal = capList.map { case (x,y) => irt.VarRef(irt.Ident(x))(y)}
+        //The body of the closure
+        val typePar = params map ( x => (x.name, irtpe.DoubleType))
         val bl = irt.Block(stVar ++ List(compileExpr(body, listId ++ typePar)))
-        irt.Closure(List(), listPar, bl, List())
+
+        irt.Closure(capDef, listPar, bl, capVal)
 
       case Call(fun , args) =>
         val argList = args.map(x => compileExpr(x,listId))
