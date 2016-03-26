@@ -2,11 +2,12 @@ package calc
 
 import org.scalajs.core.ir.{Types => irtpe, Position}
 
-/**
- * A simple typechecker.
+/** A simple typechecker.
+ *
  * Checks whether the types match or are otherwise appropriate (e.g. in the if's condition).
  * Annotates AST with types, so that they can be used during compilation.
- * TODO group errors and fail as late as possible, possibly without an exception (requires some type-work)
+ *
+  * TODO group errors and fail as late as possible, possibly without an exception (requires some type-work)
  */
 
 object Typechecker {
@@ -22,7 +23,8 @@ object Typechecker {
     case NoType          => irtpe.NoType
   }
 
-  def getType(tree: Tree, scope: TypeScope)(implicit pos: Position): Tree =  tree match {
+  def getType(tree: Tree, scope: TypeScope)
+             (implicit pos: Position): Tree =  tree match {
     case Literal(x, _)    => Literal(x, DoubleType)
     case b:      BinaryOp => checkBinop(b, scope)
     case id:     Ident    => checkIdent(id, scope)
@@ -36,22 +38,28 @@ object Typechecker {
     getType(tree, Map.empty[String, TreeType])
   }
 
-  private def checkBinop(binop: BinaryOp, scope: TypeScope)(implicit pos: Position): Tree = {
+  private def checkBinop(binop: BinaryOp, scope: TypeScope)
+                        (implicit pos: Position): Tree = {
     val lhsTyped = getType(binop.lhs, scope)
     val rhsTyped = getType(binop.rhs, scope)
     val lType = lhsTyped.tp
     val rType = rhsTyped.tp
-    if (!lType.isFunction && !rType.isFunction) BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
-    else fail(binop.pos, s"Incompatible operand types for ${binop.op}: $lType, $rType")
+
+    if (!lType.isFunction && !rType.isFunction)
+      BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
+    else
+      fail(binop.pos, s"Incompatible operand types for ${binop.op}: $lType, $rType")
   }
 
-  private def checkIdent(ident: Ident, scope: TypeScope)(implicit pos: Position): Tree =
+  private def checkIdent(ident: Ident, scope: TypeScope)
+                        (implicit pos: Position): Tree =
     scope.get(ident.name) match {
       case Some(t) => Ident(ident.name, t)
-      case None => fail(pos, s"Not in scope: ${ident.name}")
+      case None    => fail(pos, s"Not in scope: ${ident.name}")
     }
 
-  private def checkIf(ifExpr: If, scope: TypeScope)(implicit pos: Position): Tree = ifExpr match {
+  private def checkIf(ifExpr: If, scope: TypeScope)
+                     (implicit pos: Position): Tree = ifExpr match {
     case If(lit@Literal(_, _), thenp, elsep, _) =>
       val thenTyped = getType(thenp, scope)
       val elseTyped = getType(elsep, scope)
@@ -68,32 +76,44 @@ object Typechecker {
     case _ => fail(ifExpr.pos, s"If condition should be a number")
   }
 
-  private def checkLet(letExpr: Let, scope: TypeScope)(implicit pos: Position): Tree =
+  private def checkLet(letExpr: Let, scope: TypeScope)
+                      (implicit pos: Position): Tree =
     letExpr match {
       case Let(ident, value, body, _) =>
         val valueTyped = getType(value, scope)
         val identTyped = Ident(ident.name, valueTyped.tp)
-        val bodyTyped  = getType(body, updateScope(ident.name, valueTyped, scope))
+        val bodyTyped = getType(body, updateScope(ident.name, valueTyped, scope))
+
         Let(identTyped, valueTyped, bodyTyped, bodyTyped.tp)
     }
 
-  private def updateScope(name: String, value: Tree, scope: TypeScope)(implicit pos: Position): TypeScope = {
+  private def updateScope(name: String, value: Tree, scope: TypeScope)
+                         (implicit pos: Position): TypeScope = {
     val valType = getType(value, scope).tp
     scope + (name -> valType)
   }
 
-  private def checkCall(call: Call, scope: TypeScope)(implicit pos: Position): Tree = call match {
+  private def checkCall(call: Call, scope: TypeScope)
+                       (implicit pos: Position): Tree = call match {
     case Call(fun, args, _) => fun match {
       case Ident(fname, _) =>
         val argsTyped = args.map (getType (_, scope) )
         // check if function is in scope:
         val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
+
         // check if all args are numbers:
-        if (argsTyped.exists(a => a.tp.isFunction)) fail(pos, s"Argument of non-number type.")
+        if (argsTyped.exists(a => a.tp.isFunction))
+          fail(pos, s"Argument of non-number type.")
+
         // check if the arity is right:
         ftype match {
-          case FunctionType(arity) if arity == args.length => Call(getType(fun, scope), argsTyped, DoubleType)
-          case FunctionType(arity) => fail(pos, s"Function of $arity arguments called with ${args.length} arguments.")
+          case FunctionType(arity) if arity == args.length =>
+            Call(getType(fun, scope), argsTyped, DoubleType)
+
+          case FunctionType(arity) =>
+            fail(pos, s"Function of $arity arguments called" +
+              s"with ${args.length} arguments.")
+
           case _ => fail(pos, s"Trying to call a non-function object.")
         }
 
@@ -102,17 +122,21 @@ object Typechecker {
       }
   }
 
-  private def checkClosure(cl: Closure, scope: TypeScope)(implicit pos: Position): Tree = cl match {
+  private def checkClosure(cl: Closure, scope: TypeScope)
+                          (implicit pos: Position): Tree = cl match {
     case Closure(params, body, _) =>
       val paramTypes = (1 to params.length).map(_ => ParamType)
       val paramNames = params.map(p => p.name)
       val paramsMap: TypeScope = paramNames.zip(paramTypes).toMap
       val paramsTyped = params.map(p => Ident(p.name, ParamType))
-      Closure(paramsTyped, getType(body, scope ++ paramsMap), FunctionType(params.length))
+
+      Closure(paramsTyped, getType(body, scope ++ paramsMap),
+        FunctionType(params.length))
   }
 
   private def formatError(pos: Position, msg: String): String =
     s"Error at line ${pos.line}, column ${pos.column}: " + msg
 
-  private def fail(pos: Position, msg: String) = throw new TypecheckerException(formatError(pos, msg))
+  private def fail(pos: Position, msg: String) =
+    throw new TypecheckerException(formatError(pos, msg))
 }
