@@ -6,7 +6,7 @@ import org.scalajs.core.ir.{Types => irtpe, Position}
  * A simple typechecker.
  * Checks whether the types match or are otherwise appropriate (e.g. in the if's condition).
  * Annotates AST with types, so that they can be used during compilation.
- * TODO group errors and fail as late as possible
+ * TODO group errors and fail as late as possible, possibly without an exception (requires some type-work)
  */
 
 object Typechecker {
@@ -17,18 +17,19 @@ object Typechecker {
 
   implicit def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
     case DoubleType      => irtpe.DoubleType
-    case FunctionType(_) => irtpe.NoType     // TODO function type representation
+    case ParamType       => irtpe.AnyType
+    case FunctionType(_) => irtpe.AnyType
     case NoType          => irtpe.NoType
   }
 
   def getType(tree: Tree, scope: TypeScope)(implicit pos: Position): Tree =  tree match {
-    case Literal(x, _)          => Literal(x, DoubleType)
-    case b@BinaryOp(_, _, _, _) => checkBinop(b, scope)
-    case id@Ident(name, _)      => checkIdent(name, scope)
-    case let@Let(_, _, _, _)    => checkLet(let, scope)
-    case ifExpr@If(_, _, _, _)  => checkIf(ifExpr, scope)
-    case call@Call(_, _, _)     => checkCall(call, scope)
-    case cl@Closure(_, _, _)    => checkClosure(cl, scope)
+    case Literal(x, _)    => Literal(x, DoubleType)
+    case b:      BinaryOp => checkBinop(b, scope)
+    case id:     Ident    => checkIdent(id, scope)
+    case let:    Let      => checkLet(let, scope)
+    case ifExpr: If       => checkIf(ifExpr, scope)
+    case call:   Call     => checkCall(call, scope)
+    case cl:     Closure  => checkClosure(cl, scope)
   }
 
   def typecheck(tree: Tree)(implicit pos: Position): Tree = {
@@ -40,14 +41,14 @@ object Typechecker {
     val rhsTyped = getType(binop.rhs, scope)
     val lType = lhsTyped.tp
     val rType = rhsTyped.tp
-    if (lType == rType && lType == DoubleType) BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
+    if (!lType.isFunction && !rType.isFunction) BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
     else fail(binop.pos, s"Incompatible operand types for ${binop.op}: $lType, $rType")
   }
 
-  private def checkIdent(name: String, scope: TypeScope)(implicit pos: Position): Tree =
-    scope.get(name) match {
-      case Some(t) => Ident(name, t)
-      case None => fail(pos, s"Not in scope: $name")
+  private def checkIdent(ident: Ident, scope: TypeScope)(implicit pos: Position): Tree =
+    scope.get(ident.name) match {
+      case Some(t) => Ident(ident.name, t)
+      case None => fail(pos, s"Not in scope: ${ident.name}")
     }
 
   private def checkIf(ifExpr: If, scope: TypeScope)(implicit pos: Position): Tree = ifExpr match {
@@ -88,7 +89,7 @@ object Typechecker {
         // check if function is in scope:
         val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
         // check if all args are numbers:
-        if (argsTyped.exists(a => a.tp != DoubleType)) fail(pos, s"Argument of non-number type.")
+        if (argsTyped.exists(a => a.tp.isFunction)) fail(pos, s"Argument of non-number type.")
         // check if the arity is right:
         ftype match {
           case FunctionType(arity) if arity == args.length => Call(getType(fun, scope), argsTyped, DoubleType)
@@ -103,10 +104,10 @@ object Typechecker {
 
   private def checkClosure(cl: Closure, scope: TypeScope)(implicit pos: Position): Tree = cl match {
     case Closure(params, body, _) =>
-      val paramTypes = (1 to params.length).map(_ => DoubleType)
+      val paramTypes = (1 to params.length).map(_ => ParamType)
       val paramNames = params.map(p => p.name)
       val paramsMap: TypeScope = paramNames.zip(paramTypes).toMap
-      val paramsTyped = params.map(p => Ident(p.name, DoubleType))
+      val paramsTyped = params.map(p => Ident(p.name, ParamType))
       Closure(paramsTyped, getType(body, scope ++ paramsMap), FunctionType(params.length))
   }
 

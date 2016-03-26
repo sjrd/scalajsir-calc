@@ -106,4 +106,37 @@ class RunTest {
     assertRun(58.0, "let x = 42 in if (0) x else x + 16")
   }
 
+  // -------- Lambdas --------------------
+  @Test def simpleLambda0(): Unit = {
+    assertRun(42.0, "let f = fun() = { 42 } in f()")
+  }
+
+  @Test def simpleLambda1(): Unit = {
+    assertRun(42.0, "let f = fun(x) = { x + 1 } in f(41)")
+  }
+
+  @Test def simpleLambda2(): Unit = {
+    assertRun(42.0, "let f = fun(x, y) = { x + y } in f(20, 22)")
+  }
+
+  @Test def lambdaCapture1(): Unit = {
+    assertRun(42.0, "let y = 10 in let f = fun(x) = { x + y } in f(32)")
+  }
+
+  @Test def lambdaCapture2(): Unit = {
+    assertRun(42.0, "let x = 5 in let y = 10 in let f = fun(z) = { x + y + z } in f(27)")
+  }
+
+  @Test def lambdaCapture3(): Unit = {
+    assertRun(42.0, "let f = fun(x) = { let y = 10 in x + y } in f(32)")
+  }
+
+  @Test def lambdaShadowing(): Unit = {
+    assertRun(42.0, "let x = 10 in let f = fun(x) = { x } in f(42)")
+  }
+
+  @Test def lambdaCompound(): Unit = {
+    assertRun(3.0, "let g = fun(x) = {x + 1} in let f = fun(x) = {g(x) + 2} in f(0)")
+  }
+
 }
