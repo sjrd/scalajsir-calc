@@ -18,7 +18,7 @@ object Typechecker {
 
   implicit def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
     case DoubleType      => irtpe.DoubleType
-    case ParamType       => irtpe.AnyType
+    case ParamType       => irtpe.DoubleType
     case FunctionType(_) => irtpe.AnyType
     case NoType          => irtpe.NoType
   }

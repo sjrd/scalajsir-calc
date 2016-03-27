@@ -4,6 +4,7 @@ import org.scalajs.core.ir
 import org.scalajs.core.ir.{Position, Trees => irt, Types => irtpe}
 import ir.Definitions._
 import calc.Typechecker.getScalaJSType
+import org.scalajs.core.ir.Types.AnyType
 
 /** Main compiler.
  *
@@ -82,10 +83,6 @@ object Compiler {
         irt.DoubleLiteral(value)
 
       case i@Ident(name, tp) => scope.get(name) match {
-        // we have to cast parameters to Double, as they are always of type AnyType:
-        case Some(t) if tp.isParam =>
-          irt.Unbox(irt.VarRef(irt.Ident(name))(irtpe.AnyType), 'D')
-
         case Some(t) => irt.VarRef(irt.Ident(name))(tp)
 
         // should never happen, typechecker will spot it first:
@@ -118,6 +115,7 @@ object Compiler {
         val captureValsC   = cpts._2
         val paramsC        = paramsFromList(params)
         val bodyC          = irt.Block(
+            localParamVars(params),
             compileExpr(body, updateScopeWithParams(params, scope)))
 
         irt.Closure(captureParamsC, paramsC, bodyC, captureValsC)
@@ -219,16 +217,40 @@ object Compiler {
     (cParamDefs, cVarRefs)
   }
 
-  /** Transforms the param list into param list for closure. */
+  /** Mangles the name according to the type. */
+  private def mangleName(name: String, tp: TreeType): String =
+    name ++ "__" ++ tp.typeSuff
+
+  /** Transforms the param list into param list for closure.
+    * Also, mangles the parameter names. */
   private def paramsFromList(params: List[Tree])
-                            (implicit pos: Position): List[irt.ParamDef] =
+                            (implicit pos: Position): List[irt.ParamDef] = {
     params map {
       case Ident(name, tp) =>
-        irt.ParamDef(irt.Ident(name), tp, mutable = false, rest = false)
+        irt.ParamDef(
+          irt.Ident(mangleName(name, tp)),
+          irtpe.AnyType, // all params have to be AnyType
+          mutable = false, rest = false)
 
       case _ =>
         throw new Exception(s"Non-identifier in argument position in function declaration.")
     }
+  }
+
+  /** Produces the list of local variable declarations */
+  private def localParamVars(params: List[Ident])
+                            (implicit pos: Position): irt.Tree = {
+    def localVar(param: Ident): irt.VarDef = param match {
+      case Ident(name, tp) =>
+        val typeCode = tp.typeSuff.charAt(0)
+        val nameM    = mangleName(name, tp)
+      val varRef   = irt.Unbox(irt.VarRef(irt.Ident(nameM))(irtpe.AnyType), typeCode)
+        val newIdent = irt.Ident(name)
+        irt.VarDef(newIdent, tp, mutable = false, varRef)
+    }
+
+    irt.Block(params.map(localVar))
+  }
 
   /** Updates the scope with closure's parameters. */
   private def updateScopeWithParams(params: List[Tree], scope: Scope): Scope = {
