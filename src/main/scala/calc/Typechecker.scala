@@ -42,8 +42,8 @@ object Typechecker {
                         (implicit pos: Position): Tree = {
     val lhsTyped = getType(binop.lhs, scope)
     val rhsTyped = getType(binop.rhs, scope)
-    val lType = lhsTyped.tp
-    val rType = rhsTyped.tp
+    val lType    = lhsTyped.tp
+    val rType    = rhsTyped.tp
 
     if (!lType.isFunction && !rType.isFunction)
       BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
@@ -63,8 +63,8 @@ object Typechecker {
     case If(lit@Literal(_, _), thenp, elsep, _) =>
       val thenTyped = getType(thenp, scope)
       val elseTyped = getType(elsep, scope)
-      val tType = thenTyped.tp
-      val eType = elseTyped.tp
+      val tType     = thenTyped.tp
+      val eType     = elseTyped.tp
 
       if (tType != eType)
         fail(ifExpr.pos,
@@ -82,7 +82,7 @@ object Typechecker {
       case Let(ident, value, body, _) =>
         val valueTyped = getType(value, scope)
         val identTyped = Ident(ident.name, valueTyped.tp)
-        val bodyTyped = getType(body, updateScope(ident.name, valueTyped, scope))
+        val bodyTyped  = getType(body, updateScope(ident.name, valueTyped, scope))
 
         Let(identTyped, valueTyped, bodyTyped, bodyTyped.tp)
     }
@@ -97,12 +97,12 @@ object Typechecker {
                        (implicit pos: Position): Tree = call match {
     case Call(fun, args, _) => fun match {
       case Ident(fname, _) =>
-        val argsTyped = args.map (getType (_, scope) )
+        val argsTyped       = args.map (getType (_, scope) )
         // check if function is in scope:
         val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
 
         // check if all args are numbers:
-        if (argsTyped.exists(a => a.tp.isFunction))
+        if (argsTyped.exists(_.tp.isFunction))
           fail(pos, s"Argument of non-number type.")
 
         // check if the arity is right:
@@ -112,7 +112,7 @@ object Typechecker {
 
           case FunctionType(arity) =>
             fail(pos, s"Function of $arity arguments called" +
-              s"with ${args.length} arguments.")
+                s"with ${args.length} arguments.")
 
           case _ => fail(pos, s"Trying to call a non-function object.")
         }
@@ -125,9 +125,9 @@ object Typechecker {
   private def checkClosure(cl: Closure, scope: TypeScope)
                           (implicit pos: Position): Tree = cl match {
     case Closure(params, body, _) =>
-      val paramTypes = (1 to params.length).map(_ => ParamType)
-      val paramNames = params.map(p => p.name)
-      val paramsMap: TypeScope = paramNames.zip(paramTypes).toMap
+      val paramTypes  = (1 to params.length).map(_ => ParamType)
+      val paramNames  = params.map(p => p.name)
+      val paramsMap   = paramNames.zip(paramTypes).toMap
       val paramsTyped = params.map(p => Ident(p.name, ParamType))
 
       Closure(paramsTyped, getType(body, scope ++ paramsMap),

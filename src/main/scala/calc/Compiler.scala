@@ -98,9 +98,9 @@ object Compiler {
 
       case Let(ident, value, body, _) =>
         val newScope = scope + (ident.name -> value.tp)
-        val valueC = compileExpr(value, scope)
-        val bodyC = compileExpr(body, newScope)
-        val varDefC = irt.VarDef(irt.Ident(ident.name),
+        val valueC   = compileExpr(value, scope)
+        val bodyC    = compileExpr(body, newScope)
+        val varDefC  = irt.VarDef(irt.Ident(ident.name),
             ident.tp, mutable = false, valueC)
 
         irt.Block(List(varDefC, bodyC))
@@ -114,11 +114,13 @@ object Compiler {
 
         irt.If(condC, thenpC, elsepC)(tp)
 
-      case Closure(params, body, _) =>
-        val captureParamsC = paramsFromScope(scope)
-        val paramsC = paramsFromList(params)
-        val bodyC = irt.Block(compileExpr(body, updateScopeWithParams(params, scope)))
-        val captureValsC = varRefsFromScope(scope)
+      case cl@Closure(params, body, _) =>
+        val cpts           = captures(cl, scope)
+        val captureParamsC = cpts._1
+        val captureValsC   = cpts._2
+        val paramsC        = paramsFromList(params)
+        val bodyC          = irt.Block(
+            compileExpr(body, updateScopeWithParams(params, scope)))
 
         irt.Closure(captureParamsC, paramsC, bodyC, captureValsC)
 
@@ -157,22 +159,65 @@ object Compiler {
       case _                       => irt.BooleanLiteral(value = false) // this can only be a literal -- checked by TC
     }
 
-  /** Transforms the scope into the list of capture params for closure. */
-  private def paramsFromScope(scope: Scope)
-                             (implicit pos: Position): List[irt.ParamDef] = {
-    def tupleToParamDef(p: (String, TreeType)): irt.ParamDef =
-      irt.ParamDef(irt.Ident(p._1), p._2, mutable = false, rest = false)
+  /** Extracts all the free variables from the closure body. */
+  private def freeVars(closure: Closure): Set[String] = {
+    val ps = closure.params
 
-    scope.toList.map(tupleToParamDef)
+    def freeVarsAux(body: Tree): Set[String] = body match {
+      case id@Ident(name, _) if !ps.contains(id) =>
+        Set(id.name)
+
+      case Ident(_, _) =>
+        Set.empty
+
+      case Literal(_, _) =>
+        Set.empty
+
+      case BinaryOp(_, lhs, rhs, _) =>
+        freeVarsAux(lhs) ++ freeVarsAux(rhs)
+
+      case Let(_, value, b, _) =>
+        freeVarsAux(value) ++ freeVarsAux(b)
+
+      case If(cond, thenp, elsep, _) =>
+        freeVarsAux(cond) ++ freeVarsAux(thenp) ++ freeVarsAux(elsep)
+
+      case Call(fun, args, _) =>
+        freeVarsAux(fun) ++ args.flatMap(freeVarsAux).toSet
+
+      case Closure(params, b, _)  =>
+        params.flatMap(freeVarsAux).toSet ++ freeVarsAux(b)
+    }
+
+    freeVarsAux(closure.body)
   }
 
-  /** Transforms the scope into the list of var-refs (that gets fed to a closure). */
-  private def varRefsFromScope(scope: Scope)
-                              (implicit pos: Position): List[irt.VarRef] = {
-    def tupleToVarRef(p: (String, TreeType)): irt.VarRef =
-      irt.VarRef(irt.Ident(p._1))(p._2)
+  private def captureParams(captures: List[(String, TreeType)], scope: Scope)
+                           (implicit pos: Position): List[irt.ParamDef] = {
+    captures map { p =>
+      irt.ParamDef(irt.Ident(p._1), p._2,
+          mutable = false, rest = false)
+    }
+  }
 
-    scope.toList.map(tupleToVarRef)
+  private def captureRefs(captures: List[(String, TreeType)], scope: Scope)
+                         (implicit pos: Position): List[irt.VarRef] = {
+    captures map { p =>
+      irt.VarRef(irt.Ident(p._1))(p._2)
+    }
+  }
+
+  /** All the capture params and their corresponding VarRefs for the closure.
+    * It returns an awkward tuple to avoid finding the free variables 2 times. */
+  private def captures(closure: Closure, scope: Scope)
+                      (implicit pos: Position): (List[irt.ParamDef], List[irt.VarRef]) = {
+    val freeVs     = freeVars(closure)
+    val isFree     = (p: (String, _)) => freeVs.contains(p._1)
+    val cs         = scope.toList.filter(isFree)
+    val cParamDefs = captureParams(cs, scope)
+    val cVarRefs   = captureRefs(cs, scope)
+
+    (cParamDefs, cVarRefs)
   }
 
   /** Transforms the param list into param list for closure. */
@@ -189,7 +234,7 @@ object Compiler {
   /** Updates the scope with closure's parameters. */
   private def updateScopeWithParams(params: List[Tree], scope: Scope): Scope = {
     val paramTuples = params map {
-      case Ident(name, tp) => (name, tp);
+      case Ident(name, tp) => (name, tp)
       case _               => throw new Exception("Unexpected form of parameter.")
     }
 
