@@ -97,31 +97,22 @@ object Typechecker {
 
   private def checkCall(call: Call, scope: TypeScope)
                        (implicit pos: Position): TypedTree = call match {
-    case Call(fun, args) => fun match {
-      case Ident(fname) =>
-        val argsTyped       = args.map (getType (_, scope) )
-        // check if function is in scope:
-        val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
+    case Call(fun, args) =>
+      val argsTyped = args.map (getType (_, scope) )
+      val funTyped  = getType(fun, scope)
+      val arity     = args.length
 
-        // check if all args are numbers:
-        if (argsTyped.exists(_.tp.isFunction))
-          fail(pos, s"Argument of non-number type.")
+      if (!funTyped.tp.isFunction)
+        fail(pos, s"Trying to call a non-function object.")
 
-        // check if the arity is right:
-        ftype match {
-          case FunctionType(arity) if arity == args.length =>
-            CallT(getType(fun, scope), argsTyped, DoubleType)
+      if (argsTyped.exists(_.tp.isFunction))
+        fail(pos, s"Argument of non-number type.")
 
-          case FunctionType(arity) =>
-            fail(pos, s"Function of $arity arguments called" +
-                s"with ${args.length} arguments.")
-
-          case _ => fail(pos, s"Trying to call a non-function object.")
-        }
-
-      case _ =>
-        fail(pos, s"Trying to call a non-function object 2.")
-      }
+      if (arity == args.length)
+        CallT(funTyped, argsTyped, DoubleType)
+      else
+        fail(pos, s"Function of $arity arguments called" +
+            s"with ${args.length} arguments.")
   }
 
   private def checkClosure(cl: Closure, scope: TypeScope)

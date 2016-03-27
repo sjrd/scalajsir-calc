@@ -119,15 +119,11 @@ object Compiler {
 
         irt.Closure(captureParamsC, paramsC, bodyC, captureValsC)
 
-      case CallT(fun, args, _) => fun match {
-        case IdentT(name, _) =>
-          val argsC = args.map(compileExpr(_, scope))
+      case CallT(fun, args, _) =>
+        val argsC = args.map(compileExpr(_, scope))
+        val funC  = compileExpr(fun, scope)
 
-          irt.Unbox(irt.JSFunctionApply(compileExpr(fun, scope), argsC), 'D')
-
-        // again: should never happen:
-        case _ => throw new Exception("Calling a non-function object.")
-      }
+        irt.Unbox(irt.JSFunctionApply(funC, argsC), 'D')
 
       case _ =>
         throw new Exception(s"Cannot yet compile a tree of class ${tree.getClass}")

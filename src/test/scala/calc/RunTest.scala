@@ -123,40 +123,44 @@ class RunTest {
   }
 
   // -------- Lambdas --------------------
-  @Test def simpleLambda0(): Unit = {
+  @Test def runSimpleLambda0(): Unit = {
     assertRun(42.0, "let f = fun() = { 42 } in f()")
   }
 
-  @Test def simpleLambda1(): Unit = {
+  @Test def runSimpleLambda1(): Unit = {
     assertRun(42.0, "let f = fun(x) = { x + 1 } in f(41)")
   }
 
-  @Test def simpleLambda2(): Unit = {
+  @Test def runSimpleLambda2(): Unit = {
     assertRun(42.0, "let f = fun(x, y) = { x + y } in f(20, 22)")
   }
 
-  @Test def lambdaCapture1(): Unit = {
+  @Test def runLambdaCapture1(): Unit = {
     assertRun(42.0, "let y = 10 in let f = fun(x) = { x + y } in f(32)")
   }
 
-  @Test def lambdaCapture2(): Unit = {
+  @Test def runLambdaCapture2(): Unit = {
     assertRun(42.0, "let x = 5 in let y = 10 in let f = fun(z) = { x + y + z } in f(27)")
   }
 
-  @Test def lambdaCapture3(): Unit = {
+  @Test def runLambdaCapture3(): Unit = {
     assertRun(42.0, "let f = fun(x) = { let y = 10 in x + y } in f(32)")
   }
 
-  @Test def lambdaShadowing(): Unit = {
+  @Test def runLambdaShadowing(): Unit = {
     assertRun(42.0, "let x = 10 in let f = fun(x) = { x } in f(42)")
   }
 
-  @Test def lambdaCompound1(): Unit = {
+  @Test def runLambdaCompound1(): Unit = {
     assertRun(3.0, "let g = fun(x) = {x + 1} in let f = fun(x) = {g(x) + 2} in f(0)")
   }
 
-  @Test def lambdaCompound2(): Unit = {
+  @Test def runLambdaCompound2(): Unit = {
     assertRun(4.0, "if (let f = fun(x) = {x} in f (10)) 4.0 else 2.0")
+  }
+
+  @Test def runLambdaAnonymous(): Unit = {
+    assertRun(42.0, "(fun(x) = {x})(42.0)")
   }
 
 }
