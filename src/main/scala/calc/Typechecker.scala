@@ -60,20 +60,22 @@ object Typechecker {
 
   private def checkIf(ifExpr: If, scope: TypeScope)
                      (implicit pos: Position): Tree = ifExpr match {
-    case If(lit@Literal(_, _), thenp, elsep, _) =>
+    case If(cond, thenp, elsep, _) =>
+      val condTyped = getType(cond, scope)
       val thenTyped = getType(thenp, scope)
       val elseTyped = getType(elsep, scope)
       val tType     = thenTyped.tp
       val eType     = elseTyped.tp
 
       if (tType != eType)
-        fail(ifExpr.pos,
+        fail(pos,
           s"Both branches of if should evaluate to the same type. " +
           s"Got: $tType and $eType instead.")
 
-      If(getType(lit, scope), thenTyped, elseTyped, tType)
+      if (condTyped.tp.isFunction)
+        fail(pos, s"If condition should be of number type, got a function.")
 
-    case _ => fail(ifExpr.pos, s"If condition should be a number")
+      If(getType(condTyped, scope), thenTyped, elseTyped, tType)
   }
 
   private def checkLet(letExpr: Let, scope: TypeScope)

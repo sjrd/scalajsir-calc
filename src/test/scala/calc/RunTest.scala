@@ -97,6 +97,14 @@ class RunTest {
     assertRun(16.0, "if (0) 42 else 16")
   }
 
+  @Test def runNestedIf1(): Unit = {
+    assertRun(42.0, "if (if (5) 16 else 0) 42.0 else 34.5")
+  }
+
+  @Test def runNestedIf2(): Unit = {
+    assertRun(34.5, "if (if (0) 16 else 0) 42.0 else 34.5")
+  }
+
   // ------- Compound statements ---------
   @Test def runCompoundIf1(): Unit = {
     assertRun(42.0, "let x = 42 in if (1) x else 16")
@@ -104,6 +112,14 @@ class RunTest {
 
   @Test def runCompoundIf2(): Unit = {
     assertRun(58.0, "let x = 42 in if (0) x else x + 16")
+  }
+
+  @Test def runCompoundIf3(): Unit = {
+    assertRun(36.0, "if (let x = 15 in x) 36.0 else 15.0")
+  }
+
+  @Test def runCompoundIf4(): Unit = {
+    assertRun(15.0, "if (let x = 14 in x - 14) 36.0 else 15.0")
   }
 
   // -------- Lambdas --------------------
@@ -135,8 +151,12 @@ class RunTest {
     assertRun(42.0, "let x = 10 in let f = fun(x) = { x } in f(42)")
   }
 
-  @Test def lambdaCompound(): Unit = {
+  @Test def lambdaCompound1(): Unit = {
     assertRun(3.0, "let g = fun(x) = {x + 1} in let f = fun(x) = {g(x) + 2} in f(0)")
+  }
+
+  @Test def lambdaCompound2(): Unit = {
+    assertRun(4.0, "if (let f = fun(x) = {x} in f (10)) 4.0 else 2.0")
   }
 
 }

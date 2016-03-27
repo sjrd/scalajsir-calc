@@ -106,9 +106,7 @@ object Compiler {
         irt.Block(List(varDefC, bodyC))
 
       case If(cond, thenp, elsep, tp) =>
-        // in this language, we could just optimize-out
-        // the if statement (condition is always a number)
-        val condC  = evalIfCond(cond)
+        val condC  = processIfCond(cond, scope)
         val thenpC = compileExpr(thenp, scope)
         val elsepC = compileExpr(elsep, scope)
 
@@ -151,13 +149,14 @@ object Compiler {
     case _   => throw new Exception(s"Unsupported binary operation: $op")
   }
 
-  /** If the condition has to be a number, we might as well calculate it in compile-time. */
-  private def evalIfCond(cond: Tree)
-                        (implicit pos: Position): irt.BooleanLiteral =
-    cond match {
-      case Literal(v, _) if v != 0 => irt.BooleanLiteral(value = true)
-      case _                       => irt.BooleanLiteral(value = false) // this can only be a literal -- checked by TC
-    }
+  /** Creates a comparison-with-zero to evaluate the if condition.
+    * (The condition is true if it is non-zero). */
+  private def processIfCond(cond: Tree, scope: Scope)
+                        (implicit pos: Position): irt.BinaryOp = {
+    val condC = compileExpr(cond, scope)
+    val zeroC = irt.DoubleLiteral(0.0)
+    irt.BinaryOp(irt.BinaryOp.Num_!=, condC, zeroC)
+  }
 
   /** Extracts all the free variables from the closure body. */
   private def freeVars(closure: Closure): Set[String] = {
