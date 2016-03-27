@@ -5,30 +5,48 @@ import ir.{Trees => irt, Types => irtpe}
 import ir.Definitions._
 import collection.immutable.Map
 
-sealed abstract class Type
+sealed abstract class TreeType
 
-case object Double extends Type
+case object DoubleType extends TreeType
 
-case class Fun(arg: Type, body: Type) extends Type
+case class FunType(numOfArgs: Int) extends TreeType
 
 /**
   * Created by ivan on 16/3/23.
   * A type checker and infer about types
   */
 object TypeChecker {
-  private val idToType = Map[String, Type]()
-  def typeInfer(tree: Tree)(implicit typeEnv:Map[String, Type]): Type ={
+  def typeInfer(tree: Tree, typeEnv: Map[String, TreeType] = Map()): TreeType ={
     tree match {
-      case Literal(value) => Double
+      case Literal(value) => DoubleType
       case Ident(name) => typeEnv(name)
       case BinaryOp(op, lhs, rhs) => {
-          require(typeInfer(lhs) == typeInfer(rhs))
-          typeInfer(lhs)
+        val ltype = typeInfer(lhs, typeEnv)
+        val rtype = typeInfer(rhs, typeEnv)
+        if (ltype == rtype) DoubleType
+        else throw new Exception("Binary operands does not match!")
       }
-      case Let(name, value, body) => ??? //typeInfer(body)(idToType + (name.name -> typeInfer(value)))
-      case Closure(params, body) => ???
-      case Call(fun, args) => ???
-      case If(cond, thenp, elsep) => ???
+      case Let(n, value, body) => {
+        val valueType = typeInfer(value, typeEnv)
+        typeInfer(body, typeEnv + (n.name -> valueType))
+      }
+      case Closure(params, body) =>
+        FunType(params.length)
+      case Call(fun, args) => {
+        val funType = typeInfer(fun, typeEnv)
+        if (args.length == funType.asInstanceOf[FunType].numOfArgs) DoubleType
+        else throw new Exception("Function call does not match!")
+      }
+      case If(cond, thenp, elsep) => {
+        if (typeInfer(cond, typeEnv) == DoubleType){
+          val thenType = typeInfer(thenp, typeEnv)
+          val elseType = typeInfer(elsep, typeEnv)
+          if (thenType == elseType) thenType
+          else throw new Exception("Condition statemet's two phases' type does not match!")
+        }
+        else throw new Exception("Condition should only be number!")
+
+      }
     }
   }
 }
