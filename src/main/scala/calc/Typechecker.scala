@@ -24,8 +24,8 @@ object Typechecker {
   }
 
   def getType(tree: Tree, scope: TypeScope)
-             (implicit pos: Position): Tree =  tree match {
-    case Literal(x, _)    => Literal(x, DoubleType)
+             (implicit pos: Position): TypedTree =  tree match {
+    case Literal(x)    => LiteralT(x, DoubleType)
     case b:      BinaryOp => checkBinop(b, scope)
     case id:     Ident    => checkIdent(id, scope)
     case let:    Let      => checkLet(let, scope)
@@ -34,33 +34,33 @@ object Typechecker {
     case cl:     Closure  => checkClosure(cl, scope)
   }
 
-  def typecheck(tree: Tree)(implicit pos: Position): Tree = {
+  def typecheck(tree: Tree)(implicit pos: Position): TypedTree = {
     getType(tree, Map.empty[String, TreeType])
   }
 
   private def checkBinop(binop: BinaryOp, scope: TypeScope)
-                        (implicit pos: Position): Tree = {
+                        (implicit pos: Position): TypedTree = {
     val lhsTyped = getType(binop.lhs, scope)
     val rhsTyped = getType(binop.rhs, scope)
     val lType    = lhsTyped.tp
     val rType    = rhsTyped.tp
 
     if (!lType.isFunction && !rType.isFunction)
-      BinaryOp(binop.op, lhsTyped, rhsTyped, lType)
+      BinaryOpT(binop.op, lhsTyped, rhsTyped, lType)
     else
       fail(binop.pos, s"Incompatible operand types for ${binop.op}: $lType, $rType")
   }
 
   private def checkIdent(ident: Ident, scope: TypeScope)
-                        (implicit pos: Position): Tree =
+                        (implicit pos: Position): TypedTree =
     scope.get(ident.name) match {
-      case Some(t) => Ident(ident.name, t)
+      case Some(t) => IdentT(ident.name, t)
       case None    => fail(pos, s"Not in scope: ${ident.name}")
     }
 
   private def checkIf(ifExpr: If, scope: TypeScope)
-                     (implicit pos: Position): Tree = ifExpr match {
-    case If(cond, thenp, elsep, _) =>
+                     (implicit pos: Position): TypedTree = ifExpr match {
+    case If(cond, thenp, elsep) =>
       val condTyped = getType(cond, scope)
       val thenTyped = getType(thenp, scope)
       val elseTyped = getType(elsep, scope)
@@ -75,30 +75,30 @@ object Typechecker {
       if (condTyped.tp.isFunction)
         fail(pos, s"If condition should be of number type, got a function.")
 
-      If(getType(condTyped, scope), thenTyped, elseTyped, tType)
+      IfT(condTyped, thenTyped, elseTyped, tType)
   }
 
   private def checkLet(letExpr: Let, scope: TypeScope)
-                      (implicit pos: Position): Tree =
+                      (implicit pos: Position): TypedTree =
     letExpr match {
-      case Let(ident, value, body, _) =>
+      case Let(ident, value, body) =>
         val valueTyped = getType(value, scope)
-        val identTyped = Ident(ident.name, valueTyped.tp)
+        val identTyped = IdentT(ident.name, valueTyped.tp)
         val bodyTyped  = getType(body, updateScope(ident.name, valueTyped, scope))
 
-        Let(identTyped, valueTyped, bodyTyped, bodyTyped.tp)
+        LetT(identTyped, valueTyped, bodyTyped, bodyTyped.tp)
     }
 
-  private def updateScope(name: String, value: Tree, scope: TypeScope)
+  private def updateScope(name: String, value: TypedTree, scope: TypeScope)
                          (implicit pos: Position): TypeScope = {
-    val valType = getType(value, scope).tp
+    val valType = value.tp
     scope + (name -> valType)
   }
 
   private def checkCall(call: Call, scope: TypeScope)
-                       (implicit pos: Position): Tree = call match {
-    case Call(fun, args, _) => fun match {
-      case Ident(fname, _) =>
+                       (implicit pos: Position): TypedTree = call match {
+    case Call(fun, args) => fun match {
+      case Ident(fname) =>
         val argsTyped       = args.map (getType (_, scope) )
         // check if function is in scope:
         val ftype: TreeType = scope.getOrElse(fname, fail(pos, s"Not in scope: $fname"))
@@ -110,7 +110,7 @@ object Typechecker {
         // check if the arity is right:
         ftype match {
           case FunctionType(arity) if arity == args.length =>
-            Call(getType(fun, scope), argsTyped, DoubleType)
+            CallT(getType(fun, scope), argsTyped, DoubleType)
 
           case FunctionType(arity) =>
             fail(pos, s"Function of $arity arguments called" +
@@ -125,14 +125,14 @@ object Typechecker {
   }
 
   private def checkClosure(cl: Closure, scope: TypeScope)
-                          (implicit pos: Position): Tree = cl match {
-    case Closure(params, body, _) =>
+                          (implicit pos: Position): TypedTree = cl match {
+    case Closure(params, body) =>
       val paramTypes  = (1 to params.length).map(_ => ParamType)
       val paramNames  = params.map(p => p.name)
       val paramsMap   = paramNames.zip(paramTypes).toMap
-      val paramsTyped = params.map(p => Ident(p.name, ParamType))
+      val paramsTyped = params.map(p => IdentT(p.name, ParamType))
 
-      Closure(paramsTyped, getType(body, scope ++ paramsMap),
+      ClosureT(paramsTyped, getType(body, scope ++ paramsMap),
         FunctionType(params.length))
   }
 

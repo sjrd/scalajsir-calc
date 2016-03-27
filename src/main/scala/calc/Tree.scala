@@ -5,26 +5,25 @@ import org.scalajs.core.ir.Position
 
 sealed abstract class Tree {
   def pos: Position
-  def tp: TreeType
 }
 
-final case class Literal(value: Double, tp: TreeType=NoType)
+final case class Literal(value: Double)
                         (implicit val pos: Position) extends Tree
 
-final case class Ident(name: String, tp: TreeType=NoType)
+final case class Ident(name: String)
                       (implicit val pos: Position) extends Tree
 
-final case class BinaryOp(op: String, lhs: Tree, rhs: Tree, tp: TreeType=NoType)(
+final case class BinaryOp(op: String, lhs: Tree, rhs: Tree)(
     implicit val pos: Position) extends Tree
 
-final case class Let(name: Ident, value: Tree, body: Tree, tp: TreeType=NoType)(
+final case class Let(name: Ident, value: Tree, body: Tree)(
     implicit val pos: Position) extends Tree
 
-final case class Closure(params: List[Ident], body: Tree, tp: TreeType=NoType)(
+final case class Closure(params: List[Ident], body: Tree)(
     implicit val pos: Position) extends Tree
 
-final case class Call(fun: Tree, args: List[Tree], tp: TreeType=NoType)(
+final case class Call(fun: Tree, args: List[Tree])(
     implicit val pos: Position) extends Tree
 
-final case class If(cond: Tree, thenp: Tree, elsep: Tree, tp: TreeType=NoType)(
+final case class If(cond: Tree, thenp: Tree, elsep: Tree)(
     implicit val pos: Position) extends Tree

@@ -4,7 +4,6 @@ import org.scalajs.core.ir
 import org.scalajs.core.ir.{Position, Trees => irt, Types => irtpe}
 import ir.Definitions._
 import calc.Typechecker.getScalaJSType
-import org.scalajs.core.ir.Types.AnyType
 
 /** Main compiler.
  *
@@ -74,26 +73,26 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree, scope: Scope=Map.empty[String, TreeType]): irt.Tree = {
+  def compileExpr(tree: TypedTree, scope: Scope=Map.empty[String, TreeType]): irt.Tree = {
     // TODO
     implicit val pos = tree.pos
 
     tree match {
-      case Literal(value, _) =>
+      case LiteralT(value, _) =>
         irt.DoubleLiteral(value)
 
-      case i@Ident(name, tp) => scope.get(name) match {
+      case i@IdentT(name, tp) => scope.get(name) match {
         case Some(t) => irt.VarRef(irt.Ident(name))(tp)
 
         // should never happen, typechecker will spot it first:
         case None => throw new Exception(s"Not in scope: $name")
       }
 
-      case BinaryOp(op, lhs, rhs, _) =>
+      case BinaryOpT(op, lhs, rhs, _) =>
         irt.BinaryOp(parseBinOp(op),
             compileExpr(lhs, scope), compileExpr(rhs, scope))
 
-      case Let(ident, value, body, _) =>
+      case LetT(ident, value, body, _) =>
         val newScope = scope + (ident.name -> value.tp)
         val valueC   = compileExpr(value, scope)
         val bodyC    = compileExpr(body, newScope)
@@ -102,14 +101,14 @@ object Compiler {
 
         irt.Block(List(varDefC, bodyC))
 
-      case If(cond, thenp, elsep, tp) =>
+      case IfT(cond, thenp, elsep, tp) =>
         val condC  = processIfCond(cond, scope)
         val thenpC = compileExpr(thenp, scope)
         val elsepC = compileExpr(elsep, scope)
 
         irt.If(condC, thenpC, elsepC)(tp)
 
-      case cl@Closure(params, body, _) =>
+      case cl@ClosureT(params, body, _) =>
         val cpts           = captures(cl, scope)
         val captureParamsC = cpts._1
         val captureValsC   = cpts._2
@@ -120,8 +119,8 @@ object Compiler {
 
         irt.Closure(captureParamsC, paramsC, bodyC, captureValsC)
 
-      case Call(fun, args, _) => fun match {
-        case Ident(name, _) =>
+      case CallT(fun, args, _) => fun match {
+        case IdentT(name, _) =>
           val argsC = args.map(compileExpr(_, scope))
 
           irt.Unbox(irt.JSFunctionApply(compileExpr(fun, scope), argsC), 'D')
@@ -149,7 +148,7 @@ object Compiler {
 
   /** Creates a comparison-with-zero to evaluate the if condition.
     * (The condition is true if it is non-zero). */
-  private def processIfCond(cond: Tree, scope: Scope)
+  private def processIfCond(cond: TypedTree, scope: Scope)
                         (implicit pos: Position): irt.BinaryOp = {
     val condC = compileExpr(cond, scope)
     val zeroC = irt.DoubleLiteral(0.0)
@@ -157,32 +156,32 @@ object Compiler {
   }
 
   /** Extracts all the free variables from the closure body. */
-  private def freeVars(closure: Closure): Set[String] = {
+  private def freeVars(closure: ClosureT): Set[String] = {
     val ps = closure.params
 
-    def freeVarsAux(body: Tree): Set[String] = body match {
-      case id@Ident(name, _) if !ps.contains(id) =>
+    def freeVarsAux(body: TypedTree): Set[String] = body match {
+      case id@IdentT(name, _) if !ps.contains(id) =>
         Set(id.name)
 
-      case Ident(_, _) =>
+      case IdentT(_, _) =>
         Set.empty
 
-      case Literal(_, _) =>
+      case LiteralT(_, _) =>
         Set.empty
 
-      case BinaryOp(_, lhs, rhs, _) =>
+      case BinaryOpT(_, lhs, rhs, _) =>
         freeVarsAux(lhs) ++ freeVarsAux(rhs)
 
-      case Let(_, value, b, _) =>
+      case LetT(_, value, b, _) =>
         freeVarsAux(value) ++ freeVarsAux(b)
 
-      case If(cond, thenp, elsep, _) =>
+      case IfT(cond, thenp, elsep, _) =>
         freeVarsAux(cond) ++ freeVarsAux(thenp) ++ freeVarsAux(elsep)
 
-      case Call(fun, args, _) =>
+      case CallT(fun, args, _) =>
         freeVarsAux(fun) ++ args.flatMap(freeVarsAux).toSet
 
-      case Closure(params, b, _)  =>
+      case ClosureT(params, b, _)  =>
         params.flatMap(freeVarsAux).toSet ++ freeVarsAux(b)
     }
 
@@ -206,7 +205,7 @@ object Compiler {
 
   /** All the capture params and their corresponding VarRefs for the closure.
     * It returns an awkward tuple to avoid finding the free variables 2 times. */
-  private def captures(closure: Closure, scope: Scope)
+  private def captures(closure: ClosureT, scope: Scope)
                       (implicit pos: Position): (List[irt.ParamDef], List[irt.VarRef]) = {
     val freeVs     = freeVars(closure)
     val isFree     = (p: (String, _)) => freeVs.contains(p._1)
@@ -223,10 +222,10 @@ object Compiler {
 
   /** Transforms the param list into param list for closure.
     * Also, mangles the parameter names. */
-  private def paramsFromList(params: List[Tree])
+  private def paramsFromList(params: List[TypedTree])
                             (implicit pos: Position): List[irt.ParamDef] = {
     params map {
-      case Ident(name, tp) =>
+      case IdentT(name, tp) =>
         irt.ParamDef(
           irt.Ident(mangleName(name, tp)),
           irtpe.AnyType, // all params have to be AnyType
@@ -238,10 +237,10 @@ object Compiler {
   }
 
   /** Produces the list of local variable declarations */
-  private def localParamVars(params: List[Ident])
+  private def localParamVars(params: List[IdentT])
                             (implicit pos: Position): irt.Tree = {
-    def localVar(param: Ident): irt.VarDef = param match {
-      case Ident(name, tp) =>
+    def localVar(param: IdentT): irt.VarDef = param match {
+      case IdentT(name, tp) =>
         val typeCode = tp.typeSuff.charAt(0)
         val nameM    = mangleName(name, tp)
       val varRef   = irt.Unbox(irt.VarRef(irt.Ident(nameM))(irtpe.AnyType), typeCode)
@@ -253,9 +252,9 @@ object Compiler {
   }
 
   /** Updates the scope with closure's parameters. */
-  private def updateScopeWithParams(params: List[Tree], scope: Scope): Scope = {
+  private def updateScopeWithParams(params: List[TypedTree], scope: Scope): Scope = {
     val paramTuples = params map {
-      case Ident(name, tp) => (name, tp)
+      case IdentT(name, tp) => (name, tp)
       case _               => throw new Exception("Unexpected form of parameter.")
     }
 
