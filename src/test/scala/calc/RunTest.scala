@@ -163,4 +163,12 @@ class RunTest {
     assertRun(42.0, "(fun(x) = {x})(42.0)")
   }
 
+  @Test def runLambdaAnonymousLet(): Unit = {
+    assertRun(42.0, "(let f = fun(x) = {x} in f)(42.0)")
+  }
+
+  @Test def runLambdaAnonymousIf(): Unit = {
+    assertRun(42.0, "(if (1) (fun(x) = {x}) else (fun(x) = {0}))(42.0)")
+  }
+
 }

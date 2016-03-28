@@ -18,7 +18,6 @@ object Typechecker {
 
   implicit def getScalaJSType(tp: TreeType): irtpe.Type = tp match {
     case DoubleType      => irtpe.DoubleType
-    case ParamType       => irtpe.DoubleType
     case FunctionType(_) => irtpe.AnyType
     case NoType          => irtpe.NoType
   }
@@ -45,10 +44,10 @@ object Typechecker {
     val lType    = lhsTyped.tp
     val rType    = rhsTyped.tp
 
-    if (!lType.isFunction && !rType.isFunction)
-      BinaryOpT(binop.op, lhsTyped, rhsTyped, lType)
-    else
+    if (lType.isFunction || rType.isFunction)
       fail(binop.pos, s"Incompatible operand types for ${binop.op}: $lType, $rType")
+
+    BinaryOpT(binop.op, lhsTyped, rhsTyped, lType)
   }
 
   private def checkIdent(ident: Ident, scope: TypeScope)
@@ -108,20 +107,20 @@ object Typechecker {
       if (argsTyped.exists(_.tp.isFunction))
         fail(pos, s"Argument of non-number type.")
 
-      if (arity == args.length)
-        CallT(funTyped, argsTyped, DoubleType)
-      else
+      if (arity != args.length)
         fail(pos, s"Function of $arity arguments called" +
             s"with ${args.length} arguments.")
+
+      CallT(funTyped, argsTyped, DoubleType)
   }
 
   private def checkClosure(cl: Closure, scope: TypeScope)
                           (implicit pos: Position): TypedTree = cl match {
     case Closure(params, body) =>
-      val paramTypes  = (1 to params.length).map(_ => ParamType)
+      val paramTypes  = (1 to params.length).map(_ => DoubleType)
       val paramNames  = params.map(p => p.name)
       val paramsMap   = paramNames.zip(paramTypes).toMap
-      val paramsTyped = params.map(p => IdentT(p.name, ParamType))
+      val paramsTyped = params.map(p => IdentT(p.name, DoubleType))
 
       ClosureT(paramsTyped, getType(body, scope ++ paramsMap),
         FunctionType(params.length))
