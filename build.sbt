@@ -12,7 +12,7 @@ libraryDependencies ++= Seq(
   "org.scala-js" %% "scalajs-tools" % scalaJSVersion,
   "org.scala-js" %% "scalajs-js-envs" % scalaJSVersion,
   "com.lihaoyi" %% "fastparse" % "0.3.7",
-  
+  "org.scalatest" % "scalatest_2.11" % "2.2.6",
   "com.novocode" % "junit-interface" % "0.9" % "test"
 )
 

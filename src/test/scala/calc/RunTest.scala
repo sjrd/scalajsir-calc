@@ -1,5 +1,6 @@
 package calc
 
+import org.scalatest.junit.AssertionsForJUnit
 import org.junit.Test
 import org.junit.Assert._
 
@@ -19,7 +20,7 @@ import java.math._
  *  compiling and running some piece of code produces the expected final
  *  result.
  */
-class RunTest {
+class RunTest extends AssertionsForJUnit{
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
@@ -33,6 +34,18 @@ class RunTest {
     Runner.run(linked, NullLogger, console)
 
     assertEquals(expected.toString(), lines.toString().trim)
+  }
+
+  private def assertException(code: String): Unit = {
+    val tree = Parser.parse(code).get.value
+    val classDef = Compiler.compileMainClass(tree)
+    val linked = Linker.link(classDef, NullLogger)
+
+    val lines = new java.io.StringWriter
+    val console = new JSConsole {
+      def log(msg: Any): Unit = lines.append(msg.toString() + "\n")
+    }
+    Runner.run(linked, NullLogger, console)
   }
 
   @Test def runLiteral(): Unit = {
@@ -74,7 +87,19 @@ class RunTest {
   }
 
   @Test def runFunctionDirectly(): Unit = {
-    assertRun(math.sin(1.0),"sin(1.0)" )
+    assertRun(math.sin(1.0), "sin(1.0)")
+  }
+
+  @Test def runNullException(): Unit = {
+    intercept[NoSuchElementException] {
+      assertException("let x=1 in y+1")
+    }
+    intercept[NoSuchElementException]{
+      assertException("sqrt(1.0)")
+    }
+    intercept[NoSuchElementException]{
+      assertException("let f=fun(x)={x+1} in let x=1 in f(y)")
+    }
   }
 
 }
