@@ -16,31 +16,43 @@ case class FunType(numOfArgs: Int) extends TreeType
   * A type checker and infer about types
   */
 object TypeChecker {
-  def typeInfer(tree: Tree, typeEnv: Map[String, TreeType] = Map()): TreeType ={
+  val mathFunctions = Set("sin", "log", "cos")
+  def typeCheck(tree: Tree, typeEnv: Map[String, TreeType] = Map()): TreeType ={
     tree match {
       case Literal(value) => DoubleType
-      case Ident(name) => typeEnv(name)
+      case Ident(name) =>
+        try{
+          typeEnv(name)
+        }catch{
+          case e:Exception => if (mathFunctions.contains(name))
+            FunType(1)
+          else throw new Exception(s"Identifier ${name} is not in the scope")
+        }
       case BinaryOp(op, lhs, rhs) => {
-        val ltype = typeInfer(lhs, typeEnv)
-        val rtype = typeInfer(rhs, typeEnv)
-        if (ltype == rtype) DoubleType
+        val ltype = typeCheck(lhs, typeEnv)
+        val rtype = typeCheck(rhs, typeEnv)
+        if (ltype == DoubleType && rtype == DoubleType) DoubleType
         else throw new Exception("Binary operands does not match!")
       }
       case Let(n, value, body) => {
-        val valueType = typeInfer(value, typeEnv)
-        typeInfer(body, typeEnv + (n.name -> valueType))
+        val valueType = typeCheck(value, typeEnv)
+        typeCheck(body, typeEnv + (n.name -> valueType))
       }
       case Closure(params, body) =>
+        assert(typeCheck(body, typeEnv ++ params.map(s => (s.name, DoubleType))) == DoubleType)
         FunType(params.length)
       case Call(fun, args) => {
-        val funType = typeInfer(fun, typeEnv)
+        val funType = typeCheck(fun, typeEnv)
+        if (!funType.isInstanceOf[FunType])
+          throw new Exception(s"You could only apply on a function!")
+        args.map(s => assert(typeCheck(s, typeEnv) == DoubleType))
         if (args.length == funType.asInstanceOf[FunType].numOfArgs) DoubleType
         else throw new Exception("Function call does not match!")
       }
       case If(cond, thenp, elsep) => {
-        if (typeInfer(cond, typeEnv) == DoubleType){
-          val thenType = typeInfer(thenp, typeEnv)
-          val elseType = typeInfer(elsep, typeEnv)
+        if (typeCheck(cond, typeEnv) == DoubleType){
+          val thenType = typeCheck(thenp, typeEnv)
+          val elseType = typeCheck(elsep, typeEnv)
           if (thenType == elseType) thenType
           else throw new Exception("Condition statemet's two phases' type does not match!")
         }

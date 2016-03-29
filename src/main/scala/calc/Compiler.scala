@@ -79,15 +79,12 @@ object Compiler {
     }
   }
 
-  var seed = 1
-  def generateName():String = {
-    seed += 1
-    "generated_"+seed.toString
-  }
 
   def compileExpr(tree: Tree):irt.Tree ={
-    val treeType = typeInfer(tree)
-    compileExpr(tree, Map())
+    implicit val pos = tree.pos
+    typeCheck(tree)
+    val mathModule = irt.LoadModule(irtpe.ClassType("jl_Math$"))
+    irt.Block(List(mathModule,compileExpr(tree, Map(), mathModule)))
   }
 
 
@@ -96,8 +93,9 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree, typeEnv:Map[String, irtpe.Type]): irt.Tree = {
+  def compileExpr(tree: Tree, typeEnv: Map[String, irtpe.Type], mathModule: irt.Tree): irt.Tree = {
     implicit val pos = tree.pos
+
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
@@ -109,13 +107,13 @@ object Compiler {
           case "*" => irt.BinaryOp.Double_*
           case "/" => irt.BinaryOp.Double_/
         }
-        irt.BinaryOp(jsop, compileExpr(lhs, typeEnv), compileExpr(rhs, typeEnv))
+        irt.BinaryOp(jsop, compileExpr(lhs, typeEnv, mathModule), compileExpr(rhs, typeEnv, mathModule))
 
       case Let(ident, value, body) =>
-        val jsV = compileExpr(value, typeEnv)
+        val jsV = compileExpr(value, typeEnv, mathModule)
         val jsIdent = irt.Ident(ident.name)
         val jsId = irt.VarDef(jsIdent, jsV.tpe, mutable = false, jsV)
-        irt.Block(List(jsId, compileExpr(body, typeEnv + (ident.name -> jsV.tpe))))
+        irt.Block(List(jsId, compileExpr(body, typeEnv + (ident.name -> jsV.tpe), mathModule)))
 
       case Ident(n) =>
         try {
@@ -125,10 +123,10 @@ object Compiler {
         }
 
       case If(cond, thenp, elsep) =>
-        val jsThenp = compileExpr(thenp, typeEnv)
-        val jsElsep = compileExpr(elsep, typeEnv)
-        val jsCond = compileExpr(cond, typeEnv)
-        val finalCond = irt.BinaryOp(irt.BinaryOp.!==, irt.Unbox(jsCond,'D'), irt.DoubleLiteral(0.0))
+        val jsThenp = compileExpr(thenp, typeEnv, mathModule)
+        val jsElsep = compileExpr(elsep, typeEnv, mathModule)
+        val jsCond = compileExpr(cond, typeEnv, mathModule)
+        val finalCond = irt.BinaryOp(irt.BinaryOp.!==, jsCond, irt.DoubleLiteral(0.0))
         if (jsElsep.tpe != jsElsep.tpe){
           throw new Exception(s"The then and also phase in the conditional statement must bse same type")
         }
@@ -144,12 +142,19 @@ object Compiler {
         val unboxParams = idList.map(s =>
           irt.VarDef(irt.Ident(s.name), irtpe.DoubleType, mutable = false,
             irt.Unbox(irt.VarRef(irt.Ident("$$"+s.name))(irtpe.AnyType), 'D')))
-        val bl = irt.Block(unboxParams ++ List(compileExpr(body, newTypeEnv)))
+        val bl = irt.Block(unboxParams ++ List(compileExpr(body, newTypeEnv, mathModule)))
         irt.Closure(captureParam, params, bl, captureList.map(s => irt.VarRef(irt.Ident(s))(typeEnv(s))))
 
       case Call(f, args) =>
-        val jsFunction = compileExpr(f, typeEnv)
-        irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s, typeEnv))), 'D')
+        try{
+          val jsFunction = compileExpr(f, typeEnv, mathModule)
+          irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s, typeEnv, mathModule))), 'D')
+        }catch{
+          case e:Exception=> {
+            irt.Apply(mathModule, irt.Ident(f.asInstanceOf[Ident].name +"__D__D"), args.map(s => compileExpr(s, typeEnv, mathModule)))(irtpe.DoubleType)
+          }
+        }
+
 
       case _ => throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
