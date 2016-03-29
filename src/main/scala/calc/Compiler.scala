@@ -80,7 +80,6 @@ object Compiler {
   def compileExpr(tree: Tree):irt.Tree ={
     implicit val pos = tree.pos
     typeCheck(tree)
-    implicit val mathModule = irt.LoadModule(irtpe.ClassType("jl_Math$"))
     compileExpr(tree, Map())
   }
 
@@ -90,7 +89,7 @@ object Compiler {
    *
    *  This is the main method you have to implement.
    */
-  def compileExpr(tree: Tree, typeEnv: Map[String, irtpe.Type])(implicit mathModule: irt.Tree): irt.Tree = {
+  def compileExpr(tree: Tree, typeEnv: Map[String, irtpe.Type]): irt.Tree = {
     implicit val pos = tree.pos
     val functionTypes:Map[String, Int] = Map("sin" -> 1,
       "cos" -> 1,
@@ -151,21 +150,16 @@ object Compiler {
         val bl = irt.Block(unboxParams ++ List(compileExpr(body, newTypeEnv)))
         irt.Closure(captureParam, params, bl, captureList.map(s => irt.VarRef(irt.Ident(s))(typeEnv(s))))
 
-      case Call(f, args) =>
+      case Call(Ident(name), args) =>
         try {
-          val jsFunction = compileExpr(f, typeEnv)
-          irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s, typeEnv))), 'D')
+          if (functionTypes.contains(name)) {
+            val funcName = name + "__D" * functionTypes(name) + "__D"
+            irt.Apply(irt.LoadModule(irtpe.ClassType("jl_Math$")), irt.Ident(funcName),
+              args.map(s => compileExpr(s, typeEnv)))(irtpe.DoubleType)
+          } else irt.Unbox(irt.JSFunctionApply(compileExpr(Ident(name), typeEnv),
+            args.map(s => compileExpr(s, typeEnv))), 'D')
         }catch{
-          case e:Exception=> {
-            try {
-              val funcName = f.asInstanceOf[Ident].name
-              val identName = funcName + "__D" * functionTypes(funcName) + "__D"
-              irt.Apply(mathModule, irt.Ident(identName),
-                args.map(s => compileExpr(s, typeEnv)))(irtpe.DoubleType)
-            }catch{
-              case e:Exception => throw new Exception("The called function is not defined or supported function!")
-            }
-          }
+          case e:Exception => throw new NoSuchElementException("The called function is not defined or supported!")
         }
 
       case _ => throw new Exception(

@@ -29,13 +29,19 @@ object TypeChecker {
     tree match {
       case Literal(value) => DoubleType
       case Ident(name) =>
-        try {
+        if (mathFunctions.contains(name)) functionTypes(name)
+        else try {
+          typeEnv(name)
+        }catch{
+          case e:Exception => throw new NoSuchElementException(s"Identifier ${name} is not in the scope")
+        }
+        /*try {
           typeEnv(name)
         }catch{
           case e:Exception => if (mathFunctions.contains(name))
             functionTypes(name)
           else throw new Exception(s"Identifier ${name} is not in the scope")
-        }
+        }*/
       case BinaryOp(op, lhs, rhs) => {
         val ltype = typeCheck(lhs, typeEnv)
         val rtype = typeCheck(rhs, typeEnv)
