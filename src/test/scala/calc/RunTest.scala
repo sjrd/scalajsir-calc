@@ -71,9 +71,7 @@ class RunTest {
   @Test def runNativeFun(): Unit = {
     assertRun(2.2, "sqrt(pow(2.2,2))")
     assertRun(1.1, "pow(sin(2),2) + pow(cos(2),2) + 0.1")
-    assertTrue(Try {
-      assertRun(4.41, "let sin = fun(x) = {x*x} in sin(2.1)")
-    }.isFailure)
+    assertRun(4.41, "let sin = fun(x) = {x*x} in sin(2.1)")
   }
 
   @Test def runLambdaCaptures(): Unit = {
