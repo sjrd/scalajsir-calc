@@ -29,7 +29,7 @@ object TypeChecker {
     tree match {
       case Literal(value) => DoubleType
       case Ident(name) =>
-        try{
+        try {
           typeEnv(name)
         }catch{
           case e:Exception => if (mathFunctions.contains(name))

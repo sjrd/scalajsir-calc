@@ -15,9 +15,6 @@ object Compiler {
 
   private final val MainClassFullName = MainObjectFullName + "$"
 
-  //implicit val defaultEnv = Map[String, irt.Tree] ()
-  //implicit val defaultTypeEnv = Map[String, irtpe.Type]()
-  //implicit val defaultParams = Set[String]()
   /** Compile an expression tree into a full `ClassDef`.
    *
    *  You do not need to modify this method.
@@ -103,6 +100,7 @@ object Compiler {
       "abs" -> 1,
       "max" -> 2,
       "min" -> 2)
+
     tree match {
       case Literal(value) =>
         irt.DoubleLiteral(value)
@@ -145,7 +143,8 @@ object Compiler {
           irt.ParamDef(irt.Ident(s), typeEnv(s), mutable = false, rest = false))
         val params = idList.map(s =>
           irt.ParamDef(irt.Ident("$$"+s.name), irtpe.AnyType, mutable = false, rest = false))
-        val newTypeEnv = idList.foldLeft(typeEnv)((env: Map[String, irtpe.Type], s:Ident) => env+(s.name -> irtpe.DoubleType))
+        val newTypeEnv = idList.foldLeft(typeEnv)((env: Map[String, irtpe.Type], s:Ident)
+                                                    => env+(s.name -> irtpe.DoubleType))
         val unboxParams = idList.map(s =>
           irt.VarDef(irt.Ident(s.name), irtpe.DoubleType, mutable = false,
             irt.Unbox(irt.VarRef(irt.Ident("$$"+s.name))(irtpe.AnyType), 'D')))
@@ -153,7 +152,7 @@ object Compiler {
         irt.Closure(captureParam, params, bl, captureList.map(s => irt.VarRef(irt.Ident(s))(typeEnv(s))))
 
       case Call(f, args) =>
-        try{
+        try {
           val jsFunction = compileExpr(f, typeEnv)
           irt.Unbox(irt.JSFunctionApply(jsFunction,args.map(s => compileExpr(s, typeEnv))), 'D')
         }catch{
@@ -168,7 +167,6 @@ object Compiler {
             }
           }
         }
-
 
       case _ => throw new Exception(
             s"Cannot yet compile a tree of class ${tree.getClass}")
