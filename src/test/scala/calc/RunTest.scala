@@ -11,6 +11,7 @@ import util.Random
 import org.scalajs.core.tools.logging._
 
 import org.scalajs.jsenv.JSConsole
+import java.math._
 
 /** End-to-end tests, with parsing, compiling and running.
  *
@@ -19,7 +20,6 @@ import org.scalajs.jsenv.JSConsole
  *  result.
  */
 class RunTest {
-  val r = Random
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
@@ -40,14 +40,10 @@ class RunTest {
   }
 
   @Test def runBinaryOp(): Unit = {
-    for (i <- 1 to 5){
-      val a = r.nextDouble()
-      val b = r.nextDouble()
-      assertRun(a + b, s"${a} + ${b}")
-      assertRun(a - b, s"${a} - ${b}")
-      assertRun(a * b, s"${a} * ${b}")
-      assertRun(a / b, s"${a} / ${b}")
-    }
+    assertRun(42.0 + 24.5, "42.0 + 24.5")
+    assertRun(42.0 - 24.5, "42.0 - 24.5")
+    assertRun(42.5 * 24.5, "42.5 * 24.5")
+    assertRun(42.0 / 24.5, "42.0 / 24.5")
   }
 
   @Test def runLetOp(): Unit = {
@@ -60,12 +56,21 @@ class RunTest {
     assertRun(2.4, "if (1) 2.4 else 0.0")
   }
 
-
   @Test def runFunAndCall(): Unit = {
     assertRun(2.5, "let x=1 in x+1.5")
     assertRun(2.5, "let x=1 in let f=fun(y)={y+x} in f(1.5)")
     assertRun(2.5, "let x=1 in let y=1.5 in let f=fun(x,y)={y+x} in f(x,y)")
   }
 
+  @Test def runMathFunction(): Unit = {
+    assertRun(math.sin(1.0), "let x=1.0 in sin(x)")
+    assertRun(math.cos(1.0), "let x=1.0 in cos(x)")
+    assertRun(math.log(42.0), "let x=42.0 in log(x)")
+    assertRun(math.tan(42.0), "let x=42.0 in tan(x)")
+    assertRun(math.pow(42,2.4), "let x=42 in let y=2.4 in pow(x,y)")
+    assertRun(math.abs(-42.5), "let x=-42.5 in abs(x)")
+    assertRun(math.max(42.5,24.5), "let x=42.5 in let y=24.5 in max(x,y)")
+    assertRun(math.min(42.5,24.5), "let x=42.5 in let y=24.5 in min(x,y)")
+  }
 
 }

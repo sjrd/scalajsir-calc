@@ -16,7 +16,15 @@ case class FunType(numOfArgs: Int) extends TreeType
   * A type checker and infer about types
   */
 object TypeChecker {
-  val mathFunctions = Set("sin", "log", "cos")
+  val mathFunctions = Set("sin", "log", "cos", "pow","tan", "abs", "max", "min")
+  val functionTypes = Map("sin" -> FunType(1),
+                         "cos" -> FunType(1),
+                         "tan" -> FunType(1),
+                         "log" -> FunType(1),
+                         "pow" -> FunType(2),
+                         "abs" -> FunType(1),
+                         "max" -> FunType(2),
+                         "min" -> FunType(2))
   def typeCheck(tree: Tree, typeEnv: Map[String, TreeType] = Map()): TreeType ={
     tree match {
       case Literal(value) => DoubleType
@@ -25,7 +33,7 @@ object TypeChecker {
           typeEnv(name)
         }catch{
           case e:Exception => if (mathFunctions.contains(name))
-            FunType(1)
+            functionTypes(name)
           else throw new Exception(s"Identifier ${name} is not in the scope")
         }
       case BinaryOp(op, lhs, rhs) => {
