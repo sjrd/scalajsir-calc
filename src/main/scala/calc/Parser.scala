@@ -75,7 +75,7 @@ object Parser {
     val program: Parser[Tree] =
       P("" ~ expr ~ End) // The initial "" allows leading whitespace
 
-    private val expr = P(ifThenElse | let | fun | addSub)
+    private val expr = P(ifThenElse | let | fun | addSub | call)
 
     private val parens: P[Tree] = P("(" ~/ addSub ~ ")")
 

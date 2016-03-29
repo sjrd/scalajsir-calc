@@ -73,4 +73,8 @@ class RunTest {
     assertRun(math.min(42.5,24.5), "let x=42.5 in let y=24.5 in min(x,y)")
   }
 
+  @Test def runFunctionDirectly(): Unit = {
+    assertRun(math.sin(1.0),"sin(1.0)" )
+  }
+
 }
