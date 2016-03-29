@@ -17,6 +17,13 @@ object Compiler {
   private final val binaryOpMap = Map("+" -> Double_+, "-" -> Double_-,
       "*" -> Double_*, "/" -> Double_/)
 
+  private final val nativeFun = Map(
+    "Ident(sin)" -> "sin__D__D",
+    "Ident(cos)" -> "cos__D__D",
+    "Ident(sqrt)" -> "sqrt__D__D",
+    "Ident(pow)" -> "pow__D__D__D"
+  )
+
   /** Compile an expression tree into a full `ClassDef`.
    *
    *  You do not need to modify this method.
@@ -86,10 +93,14 @@ object Compiler {
       case Let(name, value, body) =>
         val irtId = irt.Ident(name.name)
         val letVal = compileExpr(value, listId)
-        irt.Block(List(
+        val letTree = irt.Block(List(
           irt.VarDef(irtId, letVal.tpe, false, letVal),
           compileExpr(body, listId + (name.name -> letVal.tpe)))
         )
+        nativeFun.contains(name.toString) match{
+          case true  => throw new Exception(s"${name.name} can't be redefined")
+          case false => letTree
+        }
 
       case Ident(name) =>
         listId.contains(name) match {
@@ -130,8 +141,17 @@ object Compiler {
 
       case Call(fun , args) =>
         val argList = args.map(x => compileExpr(x,listId))
-        val callTree = irt.JSFunctionApply(compileExpr(fun, listId), argList)
-        irt.Unbox(callTree,'D')
+        nativeFun.contains(fun.toString) match {
+          case true =>
+            val cl = irtpe.ClassType(encodeClassName("java.lang.Math$"))
+            val module = irt.LoadModule(cl)
+            irt.Apply(module, irt.Ident(nativeFun(fun.toString)),
+              argList)(irtpe.DoubleType)
+
+          case false =>
+            val callTree = irt.JSFunctionApply(compileExpr(fun, listId), argList)
+            irt.Unbox(callTree,'D')
+        }
 
       case _ =>
         throw new Exception(
