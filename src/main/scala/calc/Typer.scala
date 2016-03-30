@@ -2,15 +2,15 @@ package calc
 
 object Typer {
 
-  type TypeEnv = Map[Ident, Type]
+  type TypeEnv = Map[String, Type]
 
-  def emptyEnv = Map[Ident, Type]()
+  def emptyEnv = Map[String, Type]()
 
   def inferType(tree: Tree)(implicit env: TypeEnv): TreeT = {
     implicit val pos = tree.pos
     tree match {
       case t:Ident =>
-        val result = env.get(t) getOrElse (throw new UnboundVariable(t))
+        val result = env.get(t.name) getOrElse (throw new UnboundVariable(t))
         new IdentT(t.name) { val tpe = result }
       case t:Literal => LiteralT(t.value)
       case t:BinaryOp => binaryOp(t)
@@ -30,7 +30,7 @@ object Typer {
 
   def letBinding(t: Let)(implicit env: TypeEnv) = { implicit val pos = t.pos
     val value = inferType(t.value)
-    val body = inferType(t.body)(env = env + (t.name -> value.tpe))
+    val body = inferType(t.body)(env = env + (t.name.name -> value.tpe))
     new LetT(t.name, value, body) { val tpe = body.tpe }
   }
 }
