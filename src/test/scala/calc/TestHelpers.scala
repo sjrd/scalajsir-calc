@@ -55,4 +55,9 @@ object TestHelpers {
     assertTrue(s"Expected $expected but got $actual",
       ir.Hashers.hashesEqual(actualHash, expectedHash, considerPos = true))
   }
+
+  def assertType(expected: Type, sourceTree: Tree): Unit = {
+    val actual = Typer.inferType(sourceTree).getType()
+    assertTrue(s"Expected $expected but got $actual", actual == expected)
+  }
 }

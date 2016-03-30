@@ -1,9 +1,9 @@
 package calc
 
-import org.scalajs.core.ir.{Position, Types => irtpe}
+import org.scalajs.core.ir.{Position, Trees}
 
 sealed trait CompileError extends Throwable
-case class Unexpected(pos: Position, unexpected: Tree, expected: String)
+case class Unexpected(pos: Position, unexpected: Trees.Tree, expected: String)
   extends CompileError {
   override def toString(): String = {
     s"""
@@ -12,7 +12,7 @@ case class Unexpected(pos: Position, unexpected: Tree, expected: String)
     """.stripMargin
   }
 }
-case class TypeError(pos: Position, expected: irtpe.Type, got: irtpe.Type)
+case class TypeError(pos: Position, expected: Type, got: Type)
   extends CompileError {
   override def toString(): String = {
     s"""

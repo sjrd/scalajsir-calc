@@ -67,26 +67,23 @@ object Compiler {
     */
   def compileExpr(tree: Tree): irt.Tree = {
     implicit val pos = tree.pos
-    expr(tree)
+    expr(Typer.inferType(tree))
   }
 
-  def expr: NodeCompiler = literal | binaryOp
-
-  def literal = NodeCompiler { (t: Tree) => implicit val pos = t.pos
+  def expr(t: TreeT): irt.Tree = {
     t match {
-      case Literal(value) => irt.DoubleLiteral(value)
-      case other => throw Unexpected(pos, other, "double literal")
+      case t: LiteralT => literal(t)
+      case t: BinaryOpT => binaryOp(t)
     }
   }
 
-  def binaryOp = NodeCompiler { (t: Tree) => implicit val pos = t.pos
-    t match {
-      case BinaryOp(op, lhs, rhs) => {
-        val irOp = operatorToIR(op) getOrElse (throw UnknownOperator(pos, op))
-        irt.BinaryOp(irOp, expr(lhs), expr(rhs))
-      }
-      case other => throw Unexpected(pos, other, "expression")
-    }
+  def literal(t: LiteralT) = { implicit val pos = t.pos
+    irt.DoubleLiteral(t.value)
+  }
+
+  def binaryOp(t: BinaryOpT) = { implicit val pos = t.pos
+    val irOp = operatorToIR(t.op) getOrElse (throw UnknownOperator(pos, t.op))
+    irt.BinaryOp(irOp, expr(t.lhs), expr(t.rhs))
   }
 
   private def operatorToIR(op: String) = {
