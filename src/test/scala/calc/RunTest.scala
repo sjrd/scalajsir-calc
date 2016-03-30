@@ -23,4 +23,11 @@ class RunSimpleValue {
     assertRun(4979.633, "(100.0 * 50.0) - 20.5 + 0.133")
   }
 
+  @Test def letBinding() { implicit val comparison = ApproxDouble
+    assertRun(100.0, "let x = 100.0 in x")
+    assertRun(200.0, "let x = 100.0 in x + x")
+    assertRun(500.0, "let x = 100.0 in let x = x + x in x + 300")
+    assertRun(300.0, "let x = 100.0 in let y = x + x in x + y")
+  }
+
 }

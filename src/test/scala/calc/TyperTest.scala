@@ -37,6 +37,9 @@ class TyperTest {
 
   @Test def letBinding() {
     val let_x_eq_100_in_x_plus_x = Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x")))
+    val let_x_eq_100_in_100 = Let(Ident("x"), Literal(100.0), Literal(100.0))
     assertType(TDouble, let_x_eq_100_in_x_plus_x)
+    assertType(TDouble, let_x_eq_100_in_100)
   }
+
 }

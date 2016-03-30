@@ -73,9 +73,15 @@ object Compiler {
 
   def expr(t: TreeT): irt.Tree = {
     t match {
+      case t: IdentT => ident(t)
       case t: LiteralT => literal(t)
       case t: BinaryOpT => binaryOp(t)
+      case t: LetT => letBinding(t)
     }
+  }
+
+  def ident(t: IdentT): irt.Tree = { implicit val pos = t.pos
+    irt.VarRef(irt.Ident(t.name))(t.tpe.irtype)
   }
 
   def literal(t: LiteralT) = { implicit val pos = t.pos
@@ -85,6 +91,13 @@ object Compiler {
   def binaryOp(t: BinaryOpT) = { implicit val pos = t.pos
     val irOp = operatorToIR(t.op) getOrElse (throw UnknownOperator(pos, t.op))
     irt.BinaryOp(irOp, expr(t.lhs), expr(t.rhs))
+  }
+
+  def letBinding(t: LetT) = { implicit  val pos = t.pos
+    val bindingRhs = expr(t.value)
+    val binding = irt.VarDef(irt.Ident(t.name.name), t.value.tpe.irtype, false, bindingRhs)
+    val body = expr(t.body)
+    irt.Block(List(binding, body))
   }
 
   private def operatorToIR(op: String) = {

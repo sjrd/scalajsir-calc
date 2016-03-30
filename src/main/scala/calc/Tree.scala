@@ -1,11 +1,18 @@
 package calc
 
-import org.scalajs.core.ir.Position
+import org.scalajs.core.ir.{Position, Types => irtpe}
 
-sealed trait Type
-case object TDouble extends Type
-case class TFun(arity: Int) extends Type
+sealed trait Type {
+  def irtype: irtpe.Type
+}
 
+case object TDouble extends Type {
+  def irtype = irtpe.DoubleType
+}
+
+case class TFun(arity: Int) extends Type {
+  def irtype = irtpe.AnyType
+}
 
 sealed abstract class Tree {
   def pos: Position

@@ -1,5 +1,7 @@
 package calc
 
+import org.scalajs.core.ir.{Types => irtpe }
+
 object Typer {
 
   type TypeEnv = Map[String, Type]
@@ -10,7 +12,7 @@ object Typer {
     implicit val pos = tree.pos
     tree match {
       case t:Ident =>
-        val result = env.get(t.name) getOrElse (throw new UnboundVariable(t))
+        val result = env.getOrElse(t.name, throw new UnboundVariable(t))
         new IdentT(t.name) { val tpe = result }
       case t:Literal => LiteralT(t.value)
       case t:BinaryOp => binaryOp(t)
