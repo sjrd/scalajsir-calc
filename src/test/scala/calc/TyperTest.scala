@@ -23,4 +23,15 @@ class TyperTest {
     val expr_100_plus_50 = BinaryOp("+", expr_100, expr_50)
     assertType(TDouble, expr_100_plus_50)
   }
+
+  /** Uncomment this later when case analysis of closure is implemented
+  @Test(expected = classOf[TypeError])
+  def binaryExpression_negative() {
+    implicit val env = Typer.emptyEnv
+    val expr_100 = Literal(100.0)
+    val lambda = Closure(List(Ident("x")), Literal(100.0))
+    val ill_typed = BinaryOp("+", lambda, expr_100)
+    Typer.inferType(ill_typed)
+  }
+  **/
 }

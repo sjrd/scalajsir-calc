@@ -32,11 +32,11 @@ final case class If(cond: Tree, thenp: Tree, elsep: Tree)(
 
 sealed abstract class TreeT {
   def pos: Position
-  def getType(): Type
+  val tpe: Type
 }
 
 final case class LiteralT(value: Double)(implicit val pos: Position) extends TreeT {
-  def getType() = TDouble
+  val tpe = TDouble
 }
 
 abstract case class IdentT(name: String)(implicit val pos: Position) extends TreeT
