@@ -18,6 +18,7 @@ object Typer {
       case t:BinaryOp => binaryOp(t)
       case t:Let => letBinding(t)
       case t:If => ifElse(t)
+      case t:Closure => closure(t)
     }
   }
 
@@ -52,5 +53,11 @@ object Typer {
         }
       }
     }
+  }
+
+  def closure(t: Closure)(implicit env: TypeEnv) = { implicit val pos = t.pos
+    val params = t.params map { p => new IdentT(p.name) { val tpe = TDouble } }
+    val body = inferType(t.body)(env ++ (t.params map { _.name -> TDouble }))
+    new ClosureT(params, body) { val tpe = TFun(params.length) }
   }
 }

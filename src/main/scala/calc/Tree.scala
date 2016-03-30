@@ -6,6 +6,10 @@ sealed trait Type {
   def irtype: irtpe.Type
 }
 
+case object TAny extends Type {
+  def irtype = irtpe.AnyType
+}
+
 case object TDouble extends Type {
   def irtype = irtpe.DoubleType
 }

@@ -56,4 +56,13 @@ class TyperTest {
     val expr_100_plus_if = BinaryOp("+", expr_100, if_two_then_three_else_four)
     assertType(TDouble, expr_100_plus_if)
   }
+
+  @Test def closure() {
+    val fun_ret_1 = Closure(List(), Literal(20.0))
+    assertType(TFun(0), fun_ret_1)
+    val fun_x_ret_x = Closure(List(Ident("x")), Ident("x"))
+    assertType(TFun(1), fun_x_ret_x)
+    val fun_x_y_ret_x = Closure(List(Ident("x"), Ident("y")), Ident("x"))
+    assertType(TFun(2), fun_x_y_ret_x)
+  }
 }
