@@ -29,4 +29,11 @@ case class UnknownOperator(pos: Position, op: String) extends CompileError {
       """.stripMargin
   }
 }
+case class UnboundVariable(ident: Ident) extends CompileError {
+  override def toString(): String = {
+    s"""
+       | Unbound variable ${ident.name} at line ${ident.pos.line}, column ${ident.pos.column}
+     """.stripMargin
+  }
+}
 

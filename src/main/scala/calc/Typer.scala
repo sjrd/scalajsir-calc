@@ -7,9 +7,12 @@ object Typer {
   def emptyEnv = Map[Ident, Type]()
 
   def inferType(tree: Tree)(implicit env: TypeEnv): TreeT = {
+    implicit val pos = tree.pos
     tree match {
-      case t:Literal => implicit val pos = t.pos
-        LiteralT(t.value)
+      case t:Ident =>
+        val result = env.get(t) getOrElse (throw new UnboundVariable(t))
+        new IdentT(t.name) { val tpe = result }
+      case t:Literal => LiteralT(t.value)
       case t:BinaryOp => binaryOp(t)
       case t:Let => letBinding(t)
     }

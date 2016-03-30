@@ -34,4 +34,9 @@ class TyperTest {
     Typer.inferType(ill_typed)
   }
   **/
+
+  @Test def letBinding() {
+    val let_x_eq_100_in_x_plus_x = Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x")))
+    assertType(TDouble, let_x_eq_100_in_x_plus_x)
+  }
 }
