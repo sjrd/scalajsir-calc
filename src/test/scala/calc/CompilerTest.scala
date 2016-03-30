@@ -35,6 +35,7 @@ class CompilerTest {
       ir.Hashers.hashMethodDef(methodDef).hash.get
     }
 
+
     val expectedHash = hashOf(expected)
     val actual = Compiler.compileExpr(sourceTree)
     val actualHash = hashOf(actual)
@@ -45,6 +46,22 @@ class CompilerTest {
 
   @Test def compileLiteral(): Unit = {
     assertCompile(irt.DoubleLiteral(234), Literal(234))
+  }
+  @Test def runFindCapture(): Unit = {
+    def testCapture(p: String, res: Set[String]): Unit ={
+      val tree = Parser.parse(p).get.value
+      assertEquals(Compiler findCapture tree, res)
+    }
+
+    testCapture("let x=1 in x+y", Set("y"))
+    testCapture("let x=1 in let y=2 in u+v", Set("u","v"))
+    testCapture("let f=fun (x) = {let y=1 in x+y} in f (1)", Set())
+    testCapture("let f=fun (g) = {g (1)} in let g=fun (x) = {x+1} in f (g)", Set())
+    testCapture("let f=fun (g) = {g (x)} in f (y)", Set("x", "y"))
+    testCapture("fun (x) = {x + 1}", Set())
+    testCapture("let fac = fun (x) = {if (x) x*fac(x-1) else 1} in fac(5)", Set())
+    testCapture("let x=1 in let f=fun(y)={y+x} in f(1)", Set())
+    testCapture("let f=fun(y)={y+x} in f(1)", Set("x"))
   }
 
 }
