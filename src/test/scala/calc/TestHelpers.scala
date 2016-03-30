@@ -6,11 +6,18 @@ import org.scalajs.core.ir.{Trees => irt, Types => irtpe}
 import org.scalajs.core.tools.logging.NullLogger
 import org.scalajs.jsenv.JSConsole
 
+sealed trait ComparisonMethod
+
+case object ExactString extends ComparisonMethod
+case object ApproxDouble extends ComparisonMethod
+
 object TestHelpers {
 
   implicit val DummyPos = ir.Position.NoPosition
 
-  def assertRun(expected: Double, code: String): Unit = {
+  private val epsilon = 1e-5
+
+  def assertRun(expected: Double, code: String)(implicit comparison: ComparisonMethod): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
     val linked = Linker.link(classDef, NullLogger)
@@ -22,7 +29,10 @@ object TestHelpers {
 
     Runner.run(linked, NullLogger, console)
 
-    assertEquals(expected.toString(), lines.toString().trim)
+    comparison match  {
+      case ExactString => assertEquals(expected.toString(), lines.toString().trim)
+      case ApproxDouble => assertEquals(expected, lines.toString().toDouble, epsilon)
+    }
   }
 
   def assertCompile(expected: irt.Tree, sourceTree: Tree): Unit = {

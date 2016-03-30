@@ -83,7 +83,7 @@ object Compiler {
     t match {
       case BinaryOp(op, lhs, rhs) => {
         val irOp = operatorToIR(op) getOrElse (throw UnknownOperator(pos, op))
-        irt.JSBinaryOp(irOp, expr(lhs), expr(rhs))
+        irt.BinaryOp(irOp, expr(lhs), expr(rhs))
       }
       case other => throw Unexpected(pos, other, "expression")
     }
@@ -93,6 +93,8 @@ object Compiler {
     op match {
       case "+" => Some(irt.BinaryOp.Double_+)
       case "-" => Some(irt.BinaryOp.Double_-)
+      case "*" => Some(irt.BinaryOp.Double_*)
+      case "/" => Some(irt.BinaryOp.Double_/)
       case _ => None
     }
   }
