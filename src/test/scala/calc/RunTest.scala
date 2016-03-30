@@ -171,4 +171,28 @@ class RunTest {
     assertRun(42.0, "(if (1) (fun(x) = {x}) else (fun(x) = {0}))(42.0)")
   }
 
+  // -------------- MATH FUNCTIONS --------------------------
+  @Test def runSimpleMath1(): Unit = {
+    assertRun(Math.sin(1.0), "sin(1.0)")
+  }
+
+  @Test def runSimpleMath2(): Unit = {
+    assertRun(1.0, "sin(42.0) * sin(42.0) + cos(42.0) * cos(42.0)")
+  }
+
+  @Test def runSimpleMath3(): Unit = {
+    assertRun(42.0, "exp(log(42.0))")
+  }
+
+  @Test def runMathAssignment(): Unit = {
+    assertRun(Math.sin(1.0), "let f = sin in f(1.0)")
+  }
+
+  @Test def runMathIf(): Unit = {
+    assertRun(Math.sin(1.0), "(if (1) sin else cos)(1.0)")
+  }
+
+  @Test def runMathShadowing(): Unit = {
+    assertRun(42.0, "let sin = fun(x) = { x } in sin(42.0)")
+  }
 }

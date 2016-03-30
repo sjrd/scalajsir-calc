@@ -4,6 +4,7 @@ import org.scalajs.core.ir
 import org.scalajs.core.ir.{Position, Trees => irt, Types => irtpe}
 import ir.Definitions._
 import calc.Typechecker.getScalaJSType
+import org.scalajs.core.ir.Types.ClassType
 
 /** Main compiler.
  *
@@ -40,7 +41,13 @@ object Compiler {
     // typechecking:
     val typedTree = Typechecker.typecheck(tree)
 
-    val body = compileExpr(typedTree)
+    // compilation of library functions:
+    val libraryFuns = libFunsUsed(typedTree)
+    val initialScope = libFunUsedTypes(libraryFuns)
+    val body = irt.Block(
+      libFunsRedeclared(libraryFuns),
+      compileExpr(typedTree, initialScope)
+    )
 
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
@@ -257,6 +264,94 @@ object Compiler {
     val paramMap = paramTuples.toMap
 
     scope ++ paramMap  // in case of duplicates, m1 ++ m2 discards the entries from the first map
+  }
+
+  // ------------------ LIBRARY FUNCTIONS COMPILATION --------------------------
+
+  /** Returns names of all the library functions used in the program. */
+  private def libFunsUsed(tree: TypedTree): Set[String] = tree match {
+    case IdentT(name, _) if stdlib.isLibFunction(name) =>
+      Set(name)
+
+    case IdentT(_, _) =>
+      Set.empty
+
+    case LiteralT(_, _) =>
+      Set.empty
+
+    case BinaryOpT(_, lhs, rhs, _) =>
+      libFunsUsed(lhs) ++ libFunsUsed(rhs)
+
+    case LetT(_, value, b, _) =>
+      libFunsUsed(value) ++ libFunsUsed(b)
+
+    case IfT(cond, thenp, elsep, _) =>
+      libFunsUsed(cond) ++ libFunsUsed(thenp) ++ libFunsUsed(elsep)
+
+    case CallT(fun, args, _) =>
+      libFunsUsed(fun) ++ args.flatMap(libFunsUsed).toSet
+
+    case ClosureT(params, b, _)  =>
+      params.flatMap(libFunsUsed).toSet ++ libFunsUsed(b)
+  }
+
+  /** Returns the map of types of the used functions */
+  def libFunUsedTypes(funs: Set[String]): Scope = {
+    funs map {fname => (fname, stdlib.libFunType(fname))} toMap
+  }
+
+  /** Returns a mangled name of a library (java) function call */
+  def mangledLibName(fname: String, ftype: FunctionType): String = {
+    val returnSuff = "__D"
+    val paramTypes = (1 to ftype.arity).map(_ => "__D").mkString("")
+
+    fname + paramTypes + returnSuff
+  }
+
+  /** Generates a library function call AST. */
+  private def libFunCall(fnameM: String, fargNames: List[String])
+                        (implicit pos: Position): irt.Apply = {
+    val moduleName = stdlib.Math.moduleName
+    val fargs = fargNames map { name =>
+      irt.Unbox(
+        irt.VarRef(irt.Ident(name))(irtpe.AnyType),
+        'D'
+      )
+    }
+
+    irt.Apply(
+      irt.LoadModule(ClassType(moduleName)),
+      irt.Ident(fnameM),
+      fargs
+    )(irtpe.DoubleType)
+  }
+
+  /** Returns all given (used) functions redeclared as IR closures. */
+  private def libFunsRedeclared(funsUsed: Set[String])
+                            (implicit pos: Position): irt.Tree = {
+    def mkParam(i: Int): irt.ParamDef = {
+      irt.ParamDef(irt.Ident("clparam__" + i),
+        irtpe.AnyType, mutable = false, rest = false)
+    }
+
+    def mkVar(fname: String): irt.VarDef = {
+      val farity = stdlib.libFunType(fname) match {
+        case FunctionType(arity) =>
+          arity
+
+        case _ =>
+          throw new Exception("Library function with wrong signature.") // will NOT happen
+      }
+
+      val clParams  = (1 to farity).toList.map(mkParam)
+      val fargNames = (1 to farity).toList map { i => "clparam__" + i }
+      val clBody    = libFunCall(mangledLibName(fname, FunctionType(farity)), fargNames)
+      val closure   = irt.Closure(List.empty, clParams, clBody, List.empty)
+
+      irt.VarDef(irt.Ident(fname), irtpe.AnyType, mutable = false, closure)
+    }
+
+    irt.Block(funsUsed.map(mkVar).toList)
   }
 
 }

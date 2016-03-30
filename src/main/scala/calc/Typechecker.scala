@@ -54,7 +54,11 @@ object Typechecker {
                         (implicit pos: Position): TypedTree =
     scope.get(ident.name) match {
       case Some(t) => IdentT(ident.name, t)
-      case None    => fail(pos, s"Not in scope: ${ident.name}")
+      case None    =>
+        if (stdlib.isLibFunction(ident.name))
+          IdentT(ident.name, stdlib.libFunType(ident.name))
+        else
+          fail(pos, s"Not in scope: ${ident.name}")
     }
 
   private def checkIf(ifExpr: If, scope: TypeScope)
