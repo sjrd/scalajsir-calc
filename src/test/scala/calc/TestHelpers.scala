@@ -3,7 +3,7 @@ package calc
 import org.junit.Assert._
 import org.scalajs.core.ir
 import org.scalajs.core.ir.{Trees => irt, Types => irtpe}
-import org.scalajs.core.tools.logging.NullLogger
+import org.scalajs.core.tools.logging.{Level, ScalaConsoleLogger}
 import org.scalajs.jsenv.JSConsole
 
 sealed trait ComparisonMethod
@@ -20,14 +20,15 @@ object TestHelpers {
   def assertRun(expected: Double, code: String)(implicit comparison: ComparisonMethod): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
-    val linked = Linker.link(classDef, NullLogger)
+    val logger = new ScalaConsoleLogger()
+    val linked = Linker.link(classDef, logger)
 
     val lines = new java.io.StringWriter
     val console = new JSConsole {
       def log(msg: Any): Unit = lines.append(msg.toString() + "\n")
     }
 
-    Runner.run(linked, NullLogger, console)
+    Runner.run(linked, logger, console)
 
     comparison match  {
       case ExactString => assertEquals(expected.toString(), lines.toString().trim)
