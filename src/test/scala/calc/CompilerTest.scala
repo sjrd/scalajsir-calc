@@ -50,11 +50,13 @@ class CompilerTest {
 
   @Test def letBinding() {
     // Simple Binary Operation
-    val x = irt.Ident("x")
+    val x = irt.Ident("x", Some("x"))
     val ref_x = irt.VarRef(x)(irtpe.DoubleType)
-    val let_x_eq_100_in_x = irt.VarDef(x, irtpe.DoubleType, false, ref_x)
-    val let_x_eq_100_in_x_plus_x = irt.VarDef(x, irtpe.DoubleType, false,
-      irt.BinaryOp(irt.BinaryOp.Double_+, ref_x, ref_x))
+    val let_x_eq_100_in_x = irt.Block(List(
+      irt.VarDef(x, irtpe.DoubleType, false, irt.DoubleLiteral(100.0)), ref_x))
+    val let_x_eq_100_in_x_plus_x = irt.Block(List(
+      irt.VarDef(x, irtpe.DoubleType, false, irt.DoubleLiteral(100.0)),
+      irt.BinaryOp(irt.BinaryOp.Double_+, ref_x, ref_x)))
 
     assertCompile(let_x_eq_100_in_x, Let(Ident("x"), Literal(100.0), Ident("x")))
     assertCompile(let_x_eq_100_in_x_plus_x, Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x"))))

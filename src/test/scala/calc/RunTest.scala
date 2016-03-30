@@ -30,4 +30,8 @@ class RunSimpleValue {
     assertRun(300.0, "let x = 100.0 in let y = x + x in x + y")
   }
 
+  @Test(expected = classOf[UnboundVariable]) def letBinding_negative() { implicit val comparison = ApproxDouble
+    assertRun(100.0, "let x = 100.0 in let y = x + x in x + z")
+  }
+
 }

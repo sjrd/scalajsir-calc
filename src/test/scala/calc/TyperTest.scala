@@ -42,4 +42,11 @@ class TyperTest {
     assertType(TDouble, let_x_eq_100_in_100)
   }
 
+
+  @Test(expected = classOf[UnboundVariable]) def letBinding_negative() {
+    implicit val env = Typer.emptyEnv
+    val let_x_eq_100_in_x_plus_y = Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("y")))
+    Typer.inferType(let_x_eq_100_in_x_plus_y)
+  }
+
 }
