@@ -75,6 +75,40 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
+  def findFreeVar(tree: Tree, listId: Set[String]): Set[String]= {
+    implicit val pos = tree.pos
+
+    tree match {
+      case Literal(value) => Set()
+
+      case BinaryOp(op, rhs, lhs) =>
+        findFreeVar(rhs, listId) ++ findFreeVar(lhs, listId)
+
+      case Let(name, value, body) =>
+        findFreeVar(value, listId) ++ findFreeVar(body, listId + name.name)
+
+      case Ident(name) =>
+        listId.contains(name) match {
+          case true  => Set()
+          case false => Set(name)
+        }
+
+      case If(cond, thenp, elsep) =>
+        findFreeVar(cond, listId)  ++
+        findFreeVar(thenp, listId) ++
+        findFreeVar(elsep, listId)
+
+      case Closure(params, body) =>
+        val typePar = params map ( x => x.name )
+        findFreeVar(body, listId ++ typePar)
+
+      case Call(Ident(name) , args)
+        if (!(listId.contains(name)) && nativeFun.contains(name)) => Set()
+
+      case Call(fun , args) => findFreeVar(fun, listId)
+    }
+  }
+
   /** Compile an expression tree into an IR `Tree`, which is an expression
    *  that evaluates to the result of the tree.
    *
@@ -127,26 +161,28 @@ object Compiler {
                           (irtpe.AnyType), 'D')
                       )
                     }
-        //For the capture list
-        val capList = listId.toList
-        val capDef = capList.map { case (x,y) => irt.ParamDef(irt.Ident(x), y,
-          false, false)}
-        val capVal = capList.map { case (x,y) => irt.VarRef(irt.Ident(x))(y)}
+
         //The body of the closure
-        val typePar = params map ( x => (x.name, irtpe.DoubleType))
-        val bl = irt.Block(stVar ++ List(compileExpr(body, listId ++ typePar)))
+        val typePar = params map ( x => (x.name, irtpe.DoubleType) )
+        val bodyClosure = compileExpr(body, listId ++ typePar)
+        val blockClosure = irt.Block(stVar ++ List(bodyClosure))
 
-        irt.Closure(capDef, listPar, bl, capVal)
+        //Free variable discovery and capture list
+        var paramSet = (params map( x => x.name )).toSet
+        val capList = findFreeVar(body, paramSet).toList
+        val capDef = capList.map { case x => irt.ParamDef(irt.Ident(x),
+          listId(x), false, false) }
+        val capVal = capList.map
+          { case x => irt.VarRef(irt.Ident(x))(listId(x)) }
 
-      case Call(Ident(name) , args) if !(listId.contains(name)) =>
-        val argList = args.map(x => compileExpr(x,listId))
-        val mathModule = irt.LoadModule(mathClass)
-        val fun = irt.Ident(nativeFun(name))
+        irt.Closure(capDef, listPar, blockClosure, capVal)
 
-        nativeFun.contains(name) match {
-          case true  => irt.Apply(mathModule, fun, argList)(irtpe.DoubleType)
-          case false => throw new Exception(s"Function ${name} not found")
-        }
+      case Call(Ident(name) , args)
+        if (!(listId.contains(name)) && nativeFun.contains(name)) =>
+          val argList = args.map(x => compileExpr(x,listId))
+          val mathModule = irt.LoadModule(mathClass)
+          val fun = irt.Ident(nativeFun(name))
+          irt.Apply(mathModule, fun, argList)(irtpe.DoubleType)
 
       case Call(fun , args) =>
         val argList = args.map(x => compileExpr(x,listId))
