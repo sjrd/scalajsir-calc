@@ -24,7 +24,6 @@ class TyperTest {
     assertType(TDouble, expr_100_plus_50)
   }
 
-  /** Uncomment this later when case analysis of closure is implemented
   @Test(expected = classOf[TypeError])
   def binaryExpression_negative() {
     implicit val env = Typer.emptyEnv
@@ -33,7 +32,6 @@ class TyperTest {
     val ill_typed = BinaryOp("+", lambda, expr_100)
     Typer.inferType(ill_typed)
   }
-  **/
 
   @Test def letBinding() {
     val let_x_eq_100_in_x_plus_x = Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x")))
@@ -57,6 +55,20 @@ class TyperTest {
     assertType(TDouble, expr_100_plus_if)
   }
 
+  @Test(expected = classOf[TypeError]) def ifElse_cond_not_double() {
+    implicit val env = Typer.emptyEnv
+    val fun_ret_1 = Closure(List(), Literal(20.0))
+    val if_two_then_three_else_four = If(fun_ret_1, Literal(3.0), Literal(4.0))
+    Typer.inferType(if_two_then_three_else_four)
+  }
+
+  @Test(expected = classOf[TypeError]) def ifElse_then_else_differ() {
+    implicit val env = Typer.emptyEnv
+    val fun_ret_1 = Closure(List(), Literal(20.0))
+    val if_two_then_three_else_four = If(Literal(20.0), fun_ret_1, Literal(4.0))
+    Typer.inferType(if_two_then_three_else_four)
+  }
+
   @Test def closure() {
     val fun_ret_1 = Closure(List(), Literal(20.0))
     assertType(TFun(0), fun_ret_1)
@@ -77,20 +89,23 @@ class TyperTest {
   }
 
   @Test(expected = classOf[InvalidNumberOfArgument]) def call_more_arg() {
+    implicit val env = Typer.emptyEnv
     val fun_ret_1 = Closure(List(), Literal(20.0))
     val call_0 = Call(fun_ret_1, List(Literal(20.0)))
-    assertType(TDouble, call_0)
+    Typer.inferType(call_0)
   }
 
   @Test(expected = classOf[InvalidNumberOfArgument]) def call_more_param() {
+    implicit val env = Typer.emptyEnv
     val fun_ret_1 = Closure(List(Ident("x"), Ident("y")), Literal(20.0))
     val call_0 = Call(fun_ret_1, List(Literal(20.0)))
-    assertType(TDouble, call_0)
+    Typer.inferType(call_0)
   }
 
   @Test(expected = classOf[TypeError]) def call_arg_not_double() {
+    implicit val env = Typer.emptyEnv
     val fun_ret_1 = Closure(List(Ident("x")), Literal(20.0))
     val call_0 = Call(fun_ret_1, List(fun_ret_1))
-    assertType(TDouble, call_0)
+    Typer.inferType(call_0)
   }
 }
