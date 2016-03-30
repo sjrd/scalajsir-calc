@@ -88,10 +88,8 @@ object Compiler {
         findFreeVar(value, listId) ++ findFreeVar(body, listId + name.name)
 
       case Ident(name) =>
-        listId.contains(name) match {
-          case true  => Set()
-          case false => Set(name)
-        }
+        if(listId.contains(name)) Set()
+        else Set(name)
 
       case If(cond, thenp, elsep) =>
         findFreeVar(cond, listId)  ++
@@ -103,9 +101,14 @@ object Compiler {
         findFreeVar(body, listId ++ typePar)
 
       case Call(Ident(name) , args)
-        if (!(listId.contains(name)) && nativeFun.contains(name)) => Set()
+        if (!(listId.contains(name)) && nativeFun.contains(name)) =>
+         args.map( x => findFreeVar(x, listId) ).reduce( (x,y) => x++y ).toSet
 
-      case Call(fun , args) => findFreeVar(fun, listId)
+      case Call(fun , args) =>
+        val argSet = args.map( x => findFreeVar(x, listId) )
+          .reduce( (x, y) => x ++ y )
+          .toSet
+        argSet ++ findFreeVar(fun, listId)
     }
   }
 
@@ -136,10 +139,8 @@ object Compiler {
         )
 
       case Ident(name) =>
-        listId.contains(name) match {
-          case true  => irt.VarRef(irt.Ident(name))(listId(name))
-          case false => throw new Exception(s"Identifier ${name} not defined")
-        }
+        if(listId.contains(name)) irt.VarRef(irt.Ident(name))(listId(name))
+        else throw new Exception(s"Identifier ${name} not defined")
 
       case If(cond, thenp, elsep) =>
         val ifVal = compileExpr(cond, listId)
@@ -170,7 +171,7 @@ object Compiler {
         //Free variable discovery and capture list
         var paramSet = (params map( x => x.name )).toSet
         val capList = findFreeVar(body, paramSet).toList
-        val capDef = capList.map { case x => irt.ParamDef(irt.Ident(x),
+        val capDef = capList.map { x => irt.ParamDef(irt.Ident(x),
           listId(x), false, false) }
         val capVal = capList.map
           { case x => irt.VarRef(irt.Ident(x))(listId(x)) }
@@ -185,7 +186,7 @@ object Compiler {
           irt.Apply(mathModule, fun, argList)(irtpe.DoubleType)
 
       case Call(fun , args) =>
-        val argList = args.map(x => compileExpr(x,listId))
+        val argList = args.map(x => compileExpr(x, listId))
         val callTree = irt.JSFunctionApply(compileExpr(fun, listId), argList)
         irt.Unbox(callTree,'D')
 
