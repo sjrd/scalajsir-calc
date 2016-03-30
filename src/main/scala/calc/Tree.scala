@@ -57,8 +57,8 @@ abstract case class LetT(name: Ident, value: TreeT, body: TreeT)(
 abstract case class ClosureT(params: List[IdentT], body: TreeT)(
   implicit val pos: Position) extends TreeT
 
-abstract case class CallT(fun: Tree, args: List[TreeT])(
+abstract case class CallT(fun: TreeT, args: List[TreeT])(
   implicit val pos: Position) extends TreeT
 
-abstract case class IfT(cond: Tree, thenp: Tree, elsep: TreeT)(
+abstract case class IfT(cond: TreeT, thenp: TreeT, elsep: TreeT)(
   implicit val pos: Position) extends TreeT

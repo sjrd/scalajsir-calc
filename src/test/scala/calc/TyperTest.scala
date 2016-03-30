@@ -42,11 +42,18 @@ class TyperTest {
     assertType(TDouble, let_x_eq_100_in_100)
   }
 
-
   @Test(expected = classOf[UnboundVariable]) def letBinding_negative() {
     implicit val env = Typer.emptyEnv
     val let_x_eq_100_in_x_plus_y = Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("y")))
     Typer.inferType(let_x_eq_100_in_x_plus_y)
   }
 
+  @Test def ifElse() {
+    val if_two_then_three_else_four = If(Literal(2.0), Literal(3.0), Literal(4.0))
+    assertType(TDouble, if_two_then_three_else_four)
+
+    val expr_100 = Literal(100.0)
+    val expr_100_plus_if = BinaryOp("+", expr_100, if_two_then_three_else_four)
+    assertType(TDouble, expr_100_plus_if)
+  }
 }

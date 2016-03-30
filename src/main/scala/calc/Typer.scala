@@ -17,6 +17,7 @@ object Typer {
       case t:Literal => LiteralT(t.value)
       case t:BinaryOp => binaryOp(t)
       case t:Let => letBinding(t)
+      case t:If => ifElse(t)
     }
   }
 
@@ -34,5 +35,22 @@ object Typer {
     val value = inferType(t.value)
     val body = inferType(t.body)(env = env + (t.name.name -> value.tpe))
     new LetT(t.name, value, body) { val tpe = body.tpe }
+  }
+
+  def ifElse(t: If)(implicit env: TypeEnv) = { implicit val pos = t.pos
+    val cond = inferType(t.cond)
+    if (cond.tpe != TDouble) {
+      throw new TypeError(cond.pos, TDouble, cond.tpe)
+    } else {
+      val thenp = inferType(t.thenp)
+      val elsep = inferType(t.elsep)
+      if (thenp.tpe != elsep.tpe) {
+        throw new TypeError(elsep.pos, thenp.tpe, elsep.tpe)
+      } else {
+        new IfT(cond, thenp, elsep) {
+          val tpe = thenp.tpe
+        }
+      }
+    }
   }
 }
