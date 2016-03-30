@@ -73,6 +73,8 @@ class RunTest extends AssertionsForJUnit{
     assertRun(2.5, "let x=1 in x+1.5")
     assertRun(2.5, "let x=1 in let f=fun(y)={y+x} in f(1.5)")
     assertRun(2.5, "let x=1 in let y=1.5 in let f=fun(x,y)={y+x} in f(x,y)")
+    assertRun(42.5, "let sin=42.5 in sin")
+    assertRun(42.5, "let sin=fun(x,y)={x+y} in sin(42,0.5)")
   }
 
   @Test def runMathFunction(): Unit = {

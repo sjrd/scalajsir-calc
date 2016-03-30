@@ -11,7 +11,8 @@ case object DoubleType extends TreeType
 
 case class FunType(numOfArgs: Int) extends TreeType
 
-/**
+/** A type checker of the compiler
+  *
   * Created by ivan on 16/3/23.
   * A type checker and infer about types
   */
@@ -29,19 +30,12 @@ object TypeChecker {
     tree match {
       case Literal(value) => DoubleType
       case Ident(name) =>
-        if (mathFunctions.contains(name)) functionTypes(name)
+        if (typeEnv.contains(name)) typeEnv(name)
         else try {
-          typeEnv(name)
+          functionTypes(name)
         }catch{
           case e:Exception => throw new NoSuchElementException(s"Identifier ${name} is not in the scope")
         }
-        /*try {
-          typeEnv(name)
-        }catch{
-          case e:Exception => if (mathFunctions.contains(name))
-            functionTypes(name)
-          else throw new Exception(s"Identifier ${name} is not in the scope")
-        }*/
       case BinaryOp(op, lhs, rhs) => {
         val ltype = typeCheck(lhs, typeEnv)
         val rtype = typeCheck(rhs, typeEnv)

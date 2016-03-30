@@ -62,8 +62,11 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
-
-
+  /** Find the captured variables in a tree
+    *
+    * @param tree
+    * @return
+    */
   def findCapture(tree: Tree): Set[String] = {
     tree match {
       case _:Literal => Set()
@@ -76,7 +79,11 @@ object Compiler {
     }
   }
 
-
+  /** Entry of the compiler
+    *
+    * @param tree
+    * @return
+    */
   def compileExpr(tree: Tree):irt.Tree ={
     implicit val pos = tree.pos
     typeCheck(tree)
@@ -152,12 +159,14 @@ object Compiler {
 
       case Call(Ident(name), args) =>
         try {
-          if (functionTypes.contains(name)) {
+          if (typeEnv.contains(name)){
+            irt.Unbox(irt.JSFunctionApply(compileExpr(Ident(name), typeEnv),
+              args.map(s => compileExpr(s, typeEnv))), 'D')
+          }else{
             val funcName = name + "__D" * functionTypes(name) + "__D"
             irt.Apply(irt.LoadModule(irtpe.ClassType("jl_Math$")), irt.Ident(funcName),
               args.map(s => compileExpr(s, typeEnv)))(irtpe.DoubleType)
-          } else irt.Unbox(irt.JSFunctionApply(compileExpr(Ident(name), typeEnv),
-            args.map(s => compileExpr(s, typeEnv))), 'D')
+          }
         }catch{
           case e:Exception => throw new NoSuchElementException("The called function is not defined or supported!")
         }
