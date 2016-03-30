@@ -67,6 +67,7 @@ object Compiler {
     */
   def compileExpr(tree: Tree): irt.Tree = {
     implicit val pos = tree.pos
+    implicit val env = Map.empty[Ident, Type]
     expr(Typer.inferType(tree))
   }
 

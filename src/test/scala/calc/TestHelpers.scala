@@ -57,6 +57,7 @@ object TestHelpers {
   }
 
   def assertType(expected: Type, sourceTree: Tree): Unit = {
+    implicit val env = Map[Ident, Type]()
     val actual = Typer.inferType(sourceTree).getType()
     assertTrue(s"Expected $expected but got $actual", actual == expected)
   }
