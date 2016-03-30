@@ -78,6 +78,8 @@ object Compiler {
       case t: BinaryOpT => binaryOp(t)
       case t: LetT => letBinding(t)
       case t: IfT => ifElse(t)
+      case t: ClosureT => closure(t)
+      case t: CallT => call(t)
     }
   }
 
@@ -106,6 +108,18 @@ object Compiler {
     val thenp = expr(t.thenp)
     val elsep = expr(t.elsep)
     irt.If(cond, thenp, elsep)(t.tpe.irtype)
+  }
+
+  def closure(t: ClosureT) = { implicit val pos = t.pos
+    val paramDef = t.params map { ident =>
+      irt.ParamDef(irt.Ident(ident.name), ident.tpe.irtype, false, false)
+    }
+    val body = expr(t.body)
+    irt.Closure(List(), paramDef, body, List())
+  }
+
+  def call(t: CallT) = { implicit val pos = t.pos
+    irt.JSFunctionApply(expr(t.fun), t.args map expr)
   }
 
   private def operatorToIR(op: String) = {
