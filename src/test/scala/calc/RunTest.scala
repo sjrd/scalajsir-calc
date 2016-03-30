@@ -34,4 +34,14 @@ class RunSimpleValue {
     assertRun(100.0, "let x = 100.0 in let y = x + x in x + z")
   }
 
+  @Test def ifElse() { implicit val comparison = ApproxDouble
+    assertRun(100.0, "if(1.0) 100.0 else 200.0")
+    assertRun(200.0, "if(0) 100.0 else 200.0")
+  }
+
+  @Test def ifElsePlusLet() { implicit val comparison = ApproxDouble
+    assertRun(200.0, "let x = 200 in if (x - 200) 100.0 else 200.0")
+    assertRun(4, "let x = if (3) 2 else 1 in x + x" )
+  }
+
 }

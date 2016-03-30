@@ -77,6 +77,7 @@ object Compiler {
       case t: LiteralT => literal(t)
       case t: BinaryOpT => binaryOp(t)
       case t: LetT => letBinding(t)
+      case t: IfT => ifElse(t)
     }
   }
 
@@ -93,11 +94,18 @@ object Compiler {
     irt.BinaryOp(irOp, expr(t.lhs), expr(t.rhs))
   }
 
-  def letBinding(t: LetT) = { implicit  val pos = t.pos
+  def letBinding(t: LetT) = { implicit val pos = t.pos
     val bindingRhs = expr(t.value)
     val binding = irt.VarDef(irt.Ident(t.name.name), t.value.tpe.irtype, false, bindingRhs)
     val body = expr(t.body)
     irt.Block(List(binding, body))
+  }
+
+  def ifElse(t: IfT) = { implicit val pos = t.pos
+    val cond = irt.BinaryOp(irt.BinaryOp.!==, expr(t.cond), irt.DoubleLiteral(0))
+    val thenp = expr(t.thenp)
+    val elsep = expr(t.elsep)
+    irt.If(cond, thenp, elsep)(t.tpe.irtype)
   }
 
   private def operatorToIR(op: String) = {

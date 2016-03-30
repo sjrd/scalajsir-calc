@@ -49,7 +49,6 @@ class CompilerTest {
   }
 
   @Test def letBinding() {
-    // Simple Binary Operation
     val x = irt.Ident("x", Some("x"))
     val ref_x = irt.VarRef(x)(irtpe.DoubleType)
     val let_x_eq_100_in_x = irt.Block(List(
@@ -60,5 +59,12 @@ class CompilerTest {
 
     assertCompile(let_x_eq_100_in_x, Let(Ident("x"), Literal(100.0), Ident("x")))
     assertCompile(let_x_eq_100_in_x_plus_x, Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x"))))
+  }
+
+  @Test def ifElse() {
+    val one = irt.DoubleLiteral(100.0)
+    val cond = irt.BinaryOp(irt.BinaryOp.!==, one, irt.DoubleLiteral(0))
+    val if_one_then_one_else_one = irt.If(cond, one, one)(irtpe.DoubleType)
+    assertCompile(if_one_then_one_else_one, If(Literal(100.0), Literal(100.0), Literal(100.0)))
   }
 }
