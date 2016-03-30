@@ -9,7 +9,7 @@ import TestHelpers._
  *  compiling and running some piece of code produces the expected final
  *  result.
  */
-class RunSimpleValue {
+class RunTest {
 
   @Test def literal() { implicit val comparison = ExactString
     assertRun(54.3, "54.3")
