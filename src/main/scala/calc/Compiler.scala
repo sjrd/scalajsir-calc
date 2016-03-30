@@ -49,6 +49,10 @@ object Compiler {
         irt.OptimizerHints.empty, None)
 
     val body = compileExpr(tree)
+
+    val bodyTpe = TypeChecker.typeCheck(tree)
+    if(bodyTpe != NumberType) throw new TypeCheckException(bodyTpe, NumberType)
+
     val methodDef = irt.MethodDef(static = false,
         irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
         irt.OptimizerHints.empty, None)
@@ -75,7 +79,7 @@ object Compiler {
     ir.Hashers.hashClassDef(classDef)
   }
 
-  def findFreeVar(tree: Tree, listId: Set[String]): Set[String]= {
+  private def findFreeVar(tree: Tree, listId: Set[String]): Set[String]= {
     implicit val pos = tree.pos
 
     tree match {
@@ -102,12 +106,10 @@ object Compiler {
 
       case Call(Ident(name) , args)
         if (!(listId.contains(name)) && nativeFun.contains(name)) =>
-         args.map( x => findFreeVar(x, listId) ).reduce( (x,y) => x++y ).toSet
+          args.flatMap( x => findFreeVar(x, listId) ).toSet
 
       case Call(fun , args) =>
-        val argSet = args.map( x => findFreeVar(x, listId) )
-          .reduce( (x, y) => x ++ y )
-          .toSet
+        val argSet = args.flatMap( x => findFreeVar(x, listId) ).toSet
         argSet ++ findFreeVar(fun, listId)
     }
   }
@@ -140,7 +142,7 @@ object Compiler {
 
       case Ident(name) =>
         if(listId.contains(name)) irt.VarRef(irt.Ident(name))(listId(name))
-        else throw new Exception(s"Identifier ${name} not defined")
+        else throw new UnknownIdentException(name)
 
       case If(cond, thenp, elsep) =>
         val ifVal = compileExpr(cond, listId)
@@ -173,8 +175,7 @@ object Compiler {
         val capList = findFreeVar(body, paramSet).toList
         val capDef = capList.map { x => irt.ParamDef(irt.Ident(x),
           listId(x), false, false) }
-        val capVal = capList.map
-          { case x => irt.VarRef(irt.Ident(x))(listId(x)) }
+        val capVal = capList.map { x => irt.VarRef(irt.Ident(x))(listId(x)) }
 
         irt.Closure(capDef, listPar, blockClosure, capVal)
 

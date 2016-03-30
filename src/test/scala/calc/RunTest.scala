@@ -81,4 +81,24 @@ class RunTest {
                     "addDouble(2.1,2)"
               )
   }
+
+  @Test def runTypeCheck(): Unit = {
+    try {
+      assertRun(1, "let f = fun(x) = {x + 1} in f")
+      fail()
+    }
+    catch {
+      case tpe: TypeCheckException =>
+      case e : Exception => fail("Wrong exception type")
+    }
+
+    try {
+      assertRun(0, " let x = 5 in y")
+      fail()
+    }
+    catch {
+      case uie: UnknownIdentException =>
+      case e : Exception => fail("Wrong exception type")
+    }
+  }
 }
