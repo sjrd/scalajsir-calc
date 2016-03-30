@@ -1,7 +1,5 @@
 package calc
 
-import org.scalajs.core.ir.{Types => irtpe }
-
 object Typer {
 
   type TypeEnv = Map[String, Type]
@@ -19,6 +17,7 @@ object Typer {
       case t:Let => letBinding(t)
       case t:If => ifElse(t)
       case t:Closure => closure(t)
+      case t:Call => call(t)
     }
   }
 
@@ -59,5 +58,31 @@ object Typer {
     val params = t.params map { p => new IdentT(p.name) { val tpe = TDouble } }
     val body = inferType(t.body)(env ++ (t.params map { _.name -> TDouble }))
     new ClosureT(params, body) { val tpe = TFun(params.length) }
+  }
+
+  def call(t: Call)(implicit env: TypeEnv): TreeT = { implicit val pos = t.pos
+    val funType = inferType(t.fun)
+
+    funType.tpe match {
+      case TFun(arity) =>
+        val calleeArity = t.args.length
+        // Quick exit if parameter length does not match
+        if (arity != calleeArity) {
+          throw new InvalidNumberOfArgument(pos, arity, calleeArity)
+        } else {
+          // All arguments must be double
+          val typedArgs = t.args map { t =>
+            val typed = inferType(t)
+            if (typed.tpe == TDouble) {
+              typed
+            } else {
+              throw new TypeError(t.pos, TDouble, typed.tpe)
+            }
+          }
+          new CallT(funType, typedArgs) { val tpe = TDouble }
+        }
+      case other =>
+        throw new TypeError(funType.pos, TFun(t.args.length), other)
+    }
   }
 }

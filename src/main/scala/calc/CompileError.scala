@@ -36,4 +36,12 @@ case class UnboundVariable(ident: Ident) extends CompileError {
      """.stripMargin
   }
 }
+case class InvalidNumberOfArgument(pos: Position, expected: Int, got: Int) extends CompileError {
+  override def toString(): String = {
+    s"""
+       | Invalid number of argument at line ${pos.line}, column ${pos.column}
+       | Expected $expected arguments, got $got
+     """.stripMargin
+  }
+}
 

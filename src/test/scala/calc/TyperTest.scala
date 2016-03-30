@@ -65,4 +65,32 @@ class TyperTest {
     val fun_x_y_ret_x = Closure(List(Ident("x"), Ident("y")), Ident("x"))
     assertType(TFun(2), fun_x_y_ret_x)
   }
+
+  @Test def call() {
+    val fun_ret_1 = Closure(List(), Literal(20.0))
+    val call_0 = Call(fun_ret_1, List())
+    assertType(TDouble, call_0)
+
+    val fun_x_y_ret_1 = Closure(List(Ident("x"), Ident("y")), Literal(20.0))
+    val call_2 = Call(fun_x_y_ret_1, List(Literal(20.0), Literal(10.0)))
+    assertType(TDouble, call_2)
+  }
+
+  @Test(expected = classOf[InvalidNumberOfArgument]) def call_more_arg() {
+    val fun_ret_1 = Closure(List(), Literal(20.0))
+    val call_0 = Call(fun_ret_1, List(Literal(20.0)))
+    assertType(TDouble, call_0)
+  }
+
+  @Test(expected = classOf[InvalidNumberOfArgument]) def call_more_param() {
+    val fun_ret_1 = Closure(List(Ident("x"), Ident("y")), Literal(20.0))
+    val call_0 = Call(fun_ret_1, List(Literal(20.0)))
+    assertType(TDouble, call_0)
+  }
+
+  @Test(expected = classOf[TypeError]) def call_arg_not_double() {
+    val fun_ret_1 = Closure(List(Ident("x")), Literal(20.0))
+    val call_0 = Call(fun_ret_1, List(fun_ret_1))
+    assertType(TDouble, call_0)
+  }
 }
