@@ -81,6 +81,6 @@ class RunTest {
     assertRun(2.0, "sqrt(4.0)")
     assertRun(16.0, "pow(2.0, 4.0)")
     assertRun(1.0, "let sin = 0 in cos(sin)")
-    assertRun(2.0, "fun (x) = { sqrt(x) }")
+    assertRun(2.0, "(fun (x) = { sqrt(x) })(4.0)")
   }
 }
