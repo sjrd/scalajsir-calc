@@ -20,6 +20,10 @@ case class TFun(arity: Int) extends Type {
 
 case class TStaticForeignFun(clsName: String, method: String, arity: Int) extends Type {
   def irtype = irtpe.AnyType
+  override def equals(o: Any) = o match {
+    case that: TStaticForeignFun => true
+    case _ => false
+  }
 }
 
 sealed abstract class Tree {

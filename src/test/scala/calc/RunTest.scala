@@ -84,4 +84,10 @@ class RunTest {
     assertRun(1.0, "let sin = 0 in cos(sin)")
     assertRun(2.0, "(fun (x) = { sqrt(x) })(4.0)")
   }
+
+  @Test def foreignCall_eta() { implicit val comparison = ApproxDouble
+    assertRun(0.0, "let f = sin in f(0)")
+    assertRun(1.0, "let f = cos in let sin = f in sin(0)")
+    assertRun(0.0, "(if (1) sin else cos)(0)")
+  }
 }

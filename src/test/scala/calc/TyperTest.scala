@@ -1,7 +1,6 @@
 package calc
 
 import org.junit.Test
-import org.scalajs.core.ir
 import TestHelpers._
 
 /** Tests focused on the Compiler.

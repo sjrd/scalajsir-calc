@@ -65,7 +65,7 @@ object Compiler {
     *
     *  This is the main method you have to implement.
     */
-  def compileExpr(tree: Tree): irt.Tree = {
+  def compileExpr(tree: Tree, etaExpansion: Boolean = true): irt.Tree = {
     implicit val pos = tree.pos
 
     val foreignEnv = Foreign.staticJavaMethods(
@@ -83,7 +83,14 @@ object Compiler {
     val typedAst = Typer.inferType(tree)
 
     // Phase 2: Compile Typed AST to IR
-    expr(typedAst)
+    val ir = expr(typedAst)
+
+    // Phase 3: Prepend Eta expansion of foreign method to IR
+    if (etaExpansion) {
+      Foreign.prependEtaExpansion(ir, foreignEnv)
+    } else {
+      ir
+    }
   }
 
   def expr(t: TreeT): irt.Tree = {

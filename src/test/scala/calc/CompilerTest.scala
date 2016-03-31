@@ -71,10 +71,10 @@ class CompilerTest {
       irt.Unbox(irt.VarRef(irt.Ident("x__"))(irtpe.DoubleType), 'D'))
     val xRef = irt.VarRef(irt.Ident("x"))(irtpe.DoubleType)
     val fun_x_ret_x = irt.Closure(List(), List(xParam), irt.Block(List(xDef, xRef)), List())
-    val got = Compiler.compileExpr(Closure(List(Ident("x")), Ident("x")))
+    val got = Compiler.compileExpr(Closure(List(Ident("x")), Ident("x")), etaExpansion = false)
     assertTrue(got.toString equals fun_x_ret_x.toString)
   }
-  
+
   @Test def ifElse() {
     val one = irt.DoubleLiteral(100.0)
     val cond = irt.BinaryOp(irt.BinaryOp.!==, one, irt.DoubleLiteral(0))
