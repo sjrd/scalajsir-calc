@@ -155,40 +155,44 @@ object Compiler {
                         (implicit pos: Position): irt.BinaryOp = {
     val condC = compileExpr(cond, scope)
     val zeroC = irt.DoubleLiteral(0.0)
+    
     irt.BinaryOp(irt.BinaryOp.Num_!=, condC, zeroC)
   }
 
+  /** Returns the set of all identifiers in the tree matching the predicate. */
+  private def getIdents(body: TypedTree, pred: (String => Boolean)): Set[String] = body match {
+    case id@IdentT(name, _) if pred(name) =>
+      Set(id.name)
+
+    case IdentT(_, _) =>
+      Set.empty
+
+    case LiteralT(_, _) =>
+      Set.empty
+
+    case BinaryOpT(_, lhs, rhs, _) =>
+      getIdents(lhs, pred) ++ getIdents(rhs, pred)
+
+    case LetT(_, value, b, _) =>
+      getIdents(value, pred) ++ getIdents(b, pred)
+
+    case IfT(cond, thenp, elsep, _) =>
+      getIdents(cond, pred) ++ getIdents(thenp, pred) ++ getIdents(elsep, pred)
+
+    case CallT(fun, args, _) =>
+      getIdents(fun, pred) ++ args.flatMap(getIdents(_, pred)).toSet
+
+    case ClosureT(params, b, _)  =>
+      params.flatMap(getIdents(_, pred)).toSet ++ getIdents(b, pred)
+  }
+
+
   /** Extracts all the free variables from the closure body. */
   private def freeVars(closure: ClosureT): Set[String] = {
-    val ps = closure.params
+    val isParam = (pname: String) =>
+        !closure.params.exists(id => id.name == pname)
 
-    def freeVarsAux(body: TypedTree): Set[String] = body match {
-      case id@IdentT(name, _) if !ps.contains(id) =>
-        Set(id.name)
-
-      case IdentT(_, _) =>
-        Set.empty
-
-      case LiteralT(_, _) =>
-        Set.empty
-
-      case BinaryOpT(_, lhs, rhs, _) =>
-        freeVarsAux(lhs) ++ freeVarsAux(rhs)
-
-      case LetT(_, value, b, _) =>
-        freeVarsAux(value) ++ freeVarsAux(b)
-
-      case IfT(cond, thenp, elsep, _) =>
-        freeVarsAux(cond) ++ freeVarsAux(thenp) ++ freeVarsAux(elsep)
-
-      case CallT(fun, args, _) =>
-        freeVarsAux(fun) ++ args.flatMap(freeVarsAux).toSet
-
-      case ClosureT(params, b, _)  =>
-        params.flatMap(freeVarsAux).toSet ++ freeVarsAux(b)
-    }
-
-    freeVarsAux(closure.body)
+    getIdents(closure.body, isParam)
   }
 
   private def captureParams(captures: List[(String, TreeType)], scope: Scope)
@@ -268,31 +272,8 @@ object Compiler {
   // ------------------ LIBRARY FUNCTIONS COMPILATION --------------------------
 
   /** Returns names of all the library functions used in the program. */
-  private def libFunsUsed(tree: TypedTree): Set[String] = tree match {
-    case IdentT(name, _) if stdlib.isLibFunction(name) =>
-      Set(name)
-
-    case IdentT(_, _) =>
-      Set.empty
-
-    case LiteralT(_, _) =>
-      Set.empty
-
-    case BinaryOpT(_, lhs, rhs, _) =>
-      libFunsUsed(lhs) ++ libFunsUsed(rhs)
-
-    case LetT(_, value, b, _) =>
-      libFunsUsed(value) ++ libFunsUsed(b)
-
-    case IfT(cond, thenp, elsep, _) =>
-      libFunsUsed(cond) ++ libFunsUsed(thenp) ++ libFunsUsed(elsep)
-
-    case CallT(fun, args, _) =>
-      libFunsUsed(fun) ++ args.flatMap(libFunsUsed).toSet
-
-    case ClosureT(params, b, _)  =>
-      params.flatMap(libFunsUsed).toSet ++ libFunsUsed(b)
-  }
+  private def libFunsUsed(tree: TypedTree): Set[String] =
+    getIdents(tree, stdlib.isLibFunction)
 
   /** Returns the map of types of the used functions */
   def libFunUsedTypes(funs: Set[String]): Scope = {
