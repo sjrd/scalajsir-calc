@@ -70,11 +70,11 @@ object Compiler {
 
     val foreignEnv = Foreign.staticJavaMethods(
       clsName = "java.lang.Math",
-      importedMethods = Map(
-        "sin__D__D" -> ("sin" -> TFun(1)),
-        "cos__D__D" -> ("cos" -> TFun(1)),
-        "sqrt__D__D" -> ("sqrt" -> TFun(1)),
-        "pow__D__D__D" -> ("pow" -> TFun(2))
+      importedMethods = List(
+        ("sin", TFun(1)),
+        ("cos", TFun(1)),
+        ("sqrt", TFun(1)),
+        ("pow", TFun(2))
       )
     )
 
