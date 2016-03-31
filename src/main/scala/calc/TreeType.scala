@@ -20,7 +20,3 @@ case class FunctionType(arity: Int) extends TreeType {
   override def isNumber: Boolean = false
   override def typeSuff = "F"
 }
-
-case object NoType extends TreeType {
-  override def typeSuff = "\u0000"
-}

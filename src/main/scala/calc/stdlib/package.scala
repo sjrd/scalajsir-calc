@@ -6,6 +6,6 @@ package object stdlib {
     Math.functionTypes.contains(fname)
 
   def libFunType(fname: String): TreeType =
-    Math.functionTypes.getOrElse(fname, NoType)
+    Math.functionTypes.getOrElse(fname, null)
 
 }

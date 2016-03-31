@@ -195,4 +195,8 @@ class RunTest {
   @Test def runMathShadowing(): Unit = {
     assertRun(42.0, "let sin = fun(x) = { x } in sin(42.0)")
   }
+
+  @Test def run2ArgMath(): Unit = {
+    assertRun(Math.pow(2.0, 3.0), "pow(2.0, 3.0)")
+  }
 }

@@ -244,9 +244,8 @@ object Compiler {
                             (implicit pos: Position): irt.Tree = {
     def localVar(param: IdentT): irt.VarDef = param match {
       case IdentT(name, tp) =>
-        val typeCode = tp.typeSuff.charAt(0)
         val nameM    = mangleName(name, tp)
-      val varRef   = irt.Unbox(irt.VarRef(irt.Ident(nameM))(irtpe.AnyType), typeCode)
+        val varRef   = irt.Unbox(irt.VarRef(irt.Ident(nameM))(irtpe.AnyType), 'D')
         val newIdent = irt.Ident(name)
         irt.VarDef(newIdent, tp, mutable = false, varRef)
     }
@@ -303,7 +302,7 @@ object Compiler {
   /** Returns a mangled name of a library (java) function call */
   def mangledLibName(fname: String, ftype: FunctionType): String = {
     val returnSuff = "__D"
-    val paramTypes = (1 to ftype.arity).map(_ => "__D").mkString("")
+    val paramTypes = "__D" * ftype.arity
 
     fname + paramTypes + returnSuff
   }
@@ -346,7 +345,7 @@ object Compiler {
       val clParams  = (1 to farity).toList.map(mkParam)
       val fargNames = (1 to farity).toList map { i => "clparam__" + i }
       val clBody    = libFunCall(mangledLibName(fname, FunctionType(farity)), fargNames)
-      val closure   = irt.Closure(List.empty, clParams, clBody, List.empty)
+      val closure   = irt.Closure(Nil, clParams, clBody, Nil)
 
       irt.VarDef(irt.Ident(fname), irtpe.AnyType, mutable = false, closure)
     }
