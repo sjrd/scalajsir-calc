@@ -36,7 +36,7 @@ class CompilerTest {
     }
 
     val expectedHash = hashOf(expected)
-    val actual = Compiler.compileExpr(sourceTree)
+    val actual = Compiler.compileExpr(Typechecker.typecheck(sourceTree))
     val actualHash = hashOf(actual)
 
     assertTrue(s"Expected $expected but got $actual",

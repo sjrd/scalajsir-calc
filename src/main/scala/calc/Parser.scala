@@ -77,7 +77,7 @@ object Parser {
 
     private val expr = P(ifThenElse | let | fun | addSub)
 
-    private val parens: P[Tree] = P("(" ~/ addSub ~ ")")
+    private val parens: P[Tree] = P("(" ~/ expr ~ ")")
 
     private val base: P[Tree] = P(
         literal | identifier | parens
