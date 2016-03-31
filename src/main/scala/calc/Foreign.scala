@@ -25,7 +25,7 @@ object Foreign {
         case t:TStaticForeignFun => {
           val params = (1 to t.arity).map({ n => Ident("a__" + n) }).toList
           val closure = Closure(params, Call(Ident(name), params))
-          val typedClosure = Typer.closure(closure)
+          val (typedClosure, _) = Typer.closure(closure)
           val compiledClosure = Compiler.closure(typedClosure)
           val definition = irt.VarDef(irt.Ident(name), irtpe.AnyType, false, compiledClosure)
           definition :: acc

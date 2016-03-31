@@ -6,7 +6,7 @@ sealed trait Type {
   def irtype: irtpe.Type
 }
 
-case object TAny extends Type {
+case class TAny(name: String) extends Type {
   def irtype = irtpe.AnyType
 }
 
@@ -76,5 +76,8 @@ abstract case class ForeignCallT(clsName: String, methodName: String, args: List
   implicit val pos: Position) extends TreeT
 
 abstract case class IfT(cond: TreeT, thenp: TreeT, elsep: TreeT)(
+  implicit val pos: Position) extends TreeT
+
+abstract case class SelectT(receiver: String, ident: String)(
   implicit val pos: Position) extends TreeT
 

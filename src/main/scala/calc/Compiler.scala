@@ -80,7 +80,7 @@ object Compiler {
 
     // Phase 1: Convert AST to Typed AST
     implicit val typeEnv = Typer.emptyEnv ++ foreignEnv
-    val typedAst = Typer.inferType(tree)
+    val (typedAst, _) = Typer.inferType(tree)
 
     // Phase 2: Compile Typed AST to IR
     val ir = expr(typedAst)
@@ -103,6 +103,7 @@ object Compiler {
       case t: ClosureT => closure(t)
       case t: CallT => call(t)
       case t: ForeignCallT => foreignCall(t)
+      case t: SelectT => select(t)
     }
   }
 
@@ -120,10 +121,34 @@ object Compiler {
   }
 
   def letBinding(t: LetT) = { implicit val pos = t.pos
-    val bindingRhs = expr(t.value)
-    val binding = irt.VarDef(irt.Ident(t.name.name), t.value.tpe.irtype, false, bindingRhs)
     val body = expr(t.body)
-    irt.Block(List(binding, body))
+    t.value match {
+      case tree:ClosureT =>
+        // Create empty object with name f__ref
+        val emptyObject = irt.JSObjectConstr(List())
+        val bindingName = t.name.name
+        val objectName = irt.Ident(bindingName + "__ref")
+        val objectDef = irt.VarDef(objectName, irtpe.AnyType, false, emptyObject)
+
+        // Do f__ref.func = f
+        val objectRef = irt.VarRef(objectName)(irtpe.AnyType)
+        val dotSelect = irt.JSDotSelect(objectRef, irt.Ident("func"))
+        val recursiveCapture = Some(objectName.name, objectRef)
+
+        // Substitute f with f__ref.func in closure body
+        val newBody = substitute(tree, t.name.name, new SelectT(objectName.name, "func") { val tpe = tree.tpe })
+        val assign = irt.Assign(dotSelect, closure(newBody.asInstanceOf[ClosureT], recursiveCapture))
+
+        // Do the binding, i.e f = f__ref.func
+        val attrAccess = irt.JSDotSelect(objectRef, irt.Ident("func"))
+        val binding = irt.VarDef(irt.Ident(bindingName), t.value.tpe.irtype, false, attrAccess)
+        irt.Block(List(objectDef, assign, binding, body))
+      case _ => {
+        val bindingRhs = expr(t.value)
+        val binding = irt.VarDef(irt.Ident(t.name.name), t.value.tpe.irtype, false, bindingRhs)
+        irt.Block(List(binding, body))
+      }
+    }
   }
 
   def ifElse(t: IfT) = { implicit val pos = t.pos
@@ -133,15 +158,18 @@ object Compiler {
     irt.If(cond, thenp, elsep)(t.tpe.irtype)
   }
 
-  def closure(t: ClosureT) = { implicit val pos = t.pos
+  def closure(t: ClosureT, recursiveCapture: Option[(String, irt.VarRef)] = None) = { implicit val pos = t.pos
     val paramBoxed = t.params map { ident =>
       val mangled = irt.Ident(mangle(ident.name))
       irt.ParamDef(mangled, irtpe.AnyType, false, false)
     }
 
     val freeVars = freeVariables(t)
-    val captureParamsRef = freeVars map { v => irt.VarRef(irt.Ident(v._1))(v._2.irtype) } toList
-    val captureParamsDef = freeVars map { v => irt.ParamDef(irt.Ident(v._1), v._2.irtype, false, false) } toList
+    val captureParamsRef = freeVars.map({ v => irt.VarRef(irt.Ident(v._1))(v._2.irtype) }).toList
+    val recursiveCaptureRef = (recursiveCapture map { kv => kv._2 }).toList
+
+    val captureParamsDef = freeVars.map({ v => irt.ParamDef(irt.Ident(v._1), v._2.irtype, false, false) }).toList
+    val recursiveCaptureDef = (recursiveCapture map { kv => irt.ParamDef(irt.Ident(kv._1), irtpe.AnyType, false, false) }).toList
 
     val paramUnbox = t.params map { ident =>
       val mangled = irt.Ident(mangle(ident.name))
@@ -152,7 +180,8 @@ object Compiler {
     val body = expr(t.body)
     val block = irt.Block(paramUnbox ++ List(body))
 
-    irt.Closure(captureParamsDef, paramBoxed, block, captureParamsRef)
+    irt.Closure(captureParamsDef ++ recursiveCaptureDef, paramBoxed, block,
+      captureParamsRef ++ recursiveCaptureRef)
   }
 
   def call(t: CallT) = { implicit val pos = t.pos
@@ -177,12 +206,17 @@ object Compiler {
     }
   }
 
+  private def select(t: SelectT) = { implicit val pos = t.pos
+    irt.JSDotSelect(irt.VarRef(irt.Ident(t.receiver))(irtpe.AnyType), irt.Ident(t.ident))
+  }
+
   private def mangle(name: String) = name + "__"
 
   private def freeVariables(t: TreeT): Map[String, Type] = {
     t match {
       case t: IdentT => Map(t.name -> t.tpe)
       case t: LiteralT => Map.empty
+      case t: SelectT => Map.empty
       case t: BinaryOpT => freeVariables(t.lhs) ++ freeVariables(t.rhs)
       case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterKeys { _ != t.name.name }
       case t: IfT => freeVariables(t.cond) ++ freeVariables(t.elsep) ++ freeVariables(t.thenp)
@@ -191,6 +225,42 @@ object Compiler {
         freeVariables(t.body) filterKeys { !paramsName.contains(_) }
       case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
       case t: ForeignCallT => (t.args flatMap freeVariables).toMap
+    }
+  }
+
+  private def substitute(tree: TreeT, name: String, withTree: SelectT): TreeT = { implicit val pos = tree.pos
+    tree match {
+      case t: LiteralT => t
+      case t: SelectT => t
+      case t: IdentT => if (t.name == name) { withTree } else t
+      case t: BinaryOpT =>
+        val lhs = substitute(t.lhs, name, withTree)
+        val rhs = substitute(t.rhs, name, withTree)
+        new BinaryOpT(t.op, lhs, rhs) { val tpe = t.tpe }
+      case t: LetT =>
+        val value = substitute(t.value, name, withTree)
+        val body = substitute(t.body, name, withTree)
+        new LetT(t.name, value, body) { val tpe = t.tpe }
+      case t: IfT =>
+        val cond = substitute(t.cond, name, withTree)
+        val thenp = substitute(t.thenp, name, withTree)
+        val elsep = substitute(t.elsep, name, withTree)
+        new IfT(cond, thenp, elsep) { val tpe = t.tpe }
+      case t: ClosureT =>
+        val paramsName = t.params map { _.name }
+        if (paramsName.contains(name)) {
+          t
+        } else {
+          val body = substitute(t.body, name, withTree)
+          new ClosureT(t.params, body) { val tpe = t.tpe }
+        }
+      case t: CallT =>
+        val fun = substitute(t.fun, name, withTree)
+        val args = t.args map { substitute(_, name, withTree) }
+        new CallT(fun, args) { val tpe = t.tpe }
+      case t: ForeignCallT =>
+        val args = t.args map { substitute(_, name, withTree) }
+        new ForeignCallT(t.clsName, t.methodName, args) { val tpe = t.tpe }
     }
   }
 }

@@ -111,4 +111,14 @@ class TyperTest {
     val call_0 = Call(fun_ret_1, List(fun_ret_1))
     Typer.inferType(call_0)
   }
+
+  @Test(expected = classOf[InvalidNumberOfArgument]) def recursive_error() {
+    implicit val env = Typer.emptyEnv
+    // let f = fun x => f(2.0) + f(2.0, 3.0)
+    val recursiveLet = Let(Ident("f"), Closure(List(Ident("x")), BinaryOp("+",
+      Call(Ident("f"), List(Literal(2.0))),
+      Call(Ident("f"), List(Literal(2.0), Literal(3.0)))
+    )), Call(Ident("f"), List(Literal(2.0))))
+    Typer.inferType(recursiveLet)
+  }
 }
