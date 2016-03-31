@@ -128,10 +128,12 @@ object Compiler {
 
   def closure(t: ClosureT) = { implicit val pos = t.pos
     val paramBoxed = t.params map { ident =>
-      irt.ParamDef(irt.Ident(ident.name), irtpe.AnyType, false, false)
+      val mangled = irt.Ident(mangle(ident.name))
+      irt.ParamDef(mangled, irtpe.AnyType, false, false)
     }
     val paramUnbox = t.params map { ident =>
-      val varRef = irt.VarRef(irt.Ident(ident.name))(irtpe.AnyType)
+      val mangled = irt.Ident(mangle(ident.name))
+      val varRef = irt.VarRef(mangled)(irtpe.AnyType)
       val varUnbox = irt.Unbox(varRef, 'D')
       irt.VarDef(irt.Ident(ident.name), irtpe.DoubleType, false, varUnbox)
     }
@@ -162,17 +164,25 @@ object Compiler {
     }
   }
 
+  private def mangle(name: String): String = name + "__"
+
   private def freeVariables(t: TreeT): Set[String] = {
-    case t: IdentT => Set(t.name)
-    case t: LiteralT => Set()
-    case t: BinaryOpT => freeVariables(t.lhs) ++ freeVariables(t.rhs)
-    case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterNot { _ == t.name }
-    case t: IfT => freeVariables(t.cond) ++ freeVariables(t.elsep) ++ freeVariables(t.thenp)
-    case t: ClosureT =>
-      val params = t.params map { _.name }
-      freeVariables(t.body) -- params
-    case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
-    case t: ForeignCallT => t.args flatMap freeVariables
+    t match {
+      case t: IdentT => Set(t.name)
+      case t: LiteralT => Set[String]()
+      case t: BinaryOpT => freeVariables(t.lhs) ++ freeVariables(t.rhs)
+      case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterNot {
+        _ == t.name
+      }
+      case t: IfT => freeVariables(t.cond) ++ freeVariables(t.elsep) ++ freeVariables(t.thenp)
+      case t: ClosureT =>
+        val params = t.params map {
+          _.name
+        }
+        freeVariables(t.body) -- params
+      case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
+      case t: ForeignCallT => (t.args flatMap freeVariables).toSet
+    }
   }
 }
 
