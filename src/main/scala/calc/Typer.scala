@@ -63,23 +63,32 @@ object Typer {
   def call(t: Call)(implicit env: TypeEnv): TreeT = { implicit val pos = t.pos
     val funType = inferType(t.fun)
 
+    // All arguments must be double
+    val typedArgs = t.args map { t =>
+      val typed = inferType(t)
+      if (typed.tpe == TDouble) {
+        typed
+      } else {
+        throw new TypeError(t.pos, TDouble, typed.tpe)
+      }
+    }
+
     funType.tpe match {
-      case TFun(arity) =>
+      case TFun(arity)  =>
         val calleeArity = t.args.length
         // Quick exit if parameter length does not match
         if (arity != calleeArity) {
           throw new InvalidNumberOfArgument(pos, arity, calleeArity)
         } else {
-          // All arguments must be double
-          val typedArgs = t.args map { t =>
-            val typed = inferType(t)
-            if (typed.tpe == TDouble) {
-              typed
-            } else {
-              throw new TypeError(t.pos, TDouble, typed.tpe)
-            }
-          }
           new CallT(funType, typedArgs) { val tpe = TDouble }
+        }
+      case TStaticForeignFun(clsName, methodName, arity) =>
+        val calleeArity = t.args.length
+        // Quick exit if parameter length does not match
+        if (arity != calleeArity) {
+          throw new InvalidNumberOfArgument(pos, arity, calleeArity)
+        } else {
+          new ForeignCallT(clsName, methodName, typedArgs) { val tpe = TDouble }
         }
       case other =>
         throw new TypeError(funType.pos, TFun(t.args.length), other)

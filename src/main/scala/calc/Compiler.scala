@@ -67,7 +67,18 @@ object Compiler {
     */
   def compileExpr(tree: Tree): irt.Tree = {
     implicit val pos = tree.pos
-    implicit val env = Typer.emptyEnv
+
+    val foreignEnv = Foreign.staticJavaMethods(
+      clsName = "java.lang.Math",
+      importedMethods = Map(
+        "sin__D__D" -> ("sin" -> TFun(1)),
+        "cos__D__D" -> ("cos" -> TFun(1)),
+        "sqrt__D__D" -> ("sqrt" -> TFun(1)),
+        "pow__D__D__D" -> ("pow" -> TFun(2))
+      )
+    )
+
+    implicit val env = Typer.emptyEnv ++ foreignEnv
     expr(Typer.inferType(tree))
   }
 
@@ -80,6 +91,7 @@ object Compiler {
       case t: IfT => ifElse(t)
       case t: ClosureT => closure(t)
       case t: CallT => call(t)
+      case t: ForeignCallT => foreignCall(t)
     }
   }
 
@@ -127,6 +139,13 @@ object Compiler {
   def call(t: CallT) = { implicit val pos = t.pos
     val args = t.args map expr
     irt.Unbox(irt.JSFunctionApply(expr(t.fun), args), 'D')
+  }
+
+  def foreignCall(t: ForeignCallT) = { implicit val pos = t.pos
+    val receiver = irt.LoadModule(irtpe.ClassType(encodeClassName(t.clsName + "$")))
+    val method = irt.Ident(t.methodName)
+    val args = t.args map expr
+    irt.Apply(receiver, method, args)(t.tpe.irtype)
   }
 
   private def operatorToIR(op: String) = {

@@ -50,4 +50,12 @@ class RunTest {
     assertRun(200.0, "let f = fun (x) = { (x - 200) } in f(400)")
     assertRun(400.0, "let f = fun (x) = { (x - 200) } in let g = fun (f) = { (f - 200) } in g(400) + f(400)")
   }
+
+  @Test def foreignCall() { implicit val comparison = ApproxDouble
+    assertRun(1.0, "cos(0)")
+    assertRun(0.0, "sin(0)")
+    assertRun(2.0, "sqrt(4.0)")
+    assertRun(16.0, "pow(2.0, 4.0)")
+    assertRun(1.0, "let sin = 0 in cos(sin)")
+  }
 }
