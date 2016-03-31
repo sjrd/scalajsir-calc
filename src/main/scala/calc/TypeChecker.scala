@@ -1,8 +1,5 @@
 package calc
 
-import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
-
 object TypeChecker {
 
   private final val nativeFunType = Map(
@@ -36,8 +33,9 @@ object TypeChecker {
 
       case If(cond, thenp, elsep) =>
         assertType(typeCheck(cond, listId), NumberType)
-        assertType(typeCheck(thenp, listId), typeCheck(elsep, listId))
-        typeCheck(thenp, listId)
+        val thenType = typeCheck(thenp, listId)
+        assertType(thenType, typeCheck(elsep, listId))
+        thenType
 
       case Closure(params, body) =>
         val typePar = params map ( x => (x.name, NumberType) )
@@ -46,12 +44,12 @@ object TypeChecker {
 
       case Call(Ident(name) , args)
         if (!(listId.contains(name)) && nativeFunType.contains(name)) =>
-          args.map(x => assertType(typeCheck(x, listId), NumberType))
+          args.foreach(x => assertType(typeCheck(x, listId), NumberType))
           assertType(nativeFunType(name), FunctionType(args.length))
           NumberType
 
       case Call(fun , args) =>
-        args.map(x => assertType(typeCheck(x, listId), NumberType))
+        args.foreach(x => assertType(typeCheck(x, listId), NumberType))
         assertType( typeCheck(fun, listId), FunctionType(args.length))
         NumberType
     }
