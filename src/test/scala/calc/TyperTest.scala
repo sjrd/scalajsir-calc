@@ -2,7 +2,6 @@ package calc
 
 import org.junit.Test
 import org.scalajs.core.ir
-import ir.{Trees => irt}
 import TestHelpers._
 
 /** Tests focused on the Compiler.
@@ -58,15 +57,15 @@ class TyperTest {
   @Test(expected = classOf[TypeError]) def ifElse_cond_not_double() {
     implicit val env = Typer.emptyEnv
     val fun_ret_1 = Closure(List(), Literal(20.0))
-    val if_two_then_three_else_four = If(fun_ret_1, Literal(3.0), Literal(4.0))
-    Typer.inferType(if_two_then_three_else_four)
+    val if_fun_then_three_else_four = If(fun_ret_1, Literal(3.0), Literal(4.0))
+    Typer.inferType(if_fun_then_three_else_four)
   }
 
   @Test(expected = classOf[TypeError]) def ifElse_then_else_differ() {
     implicit val env = Typer.emptyEnv
-    val fun_ret_1 = Closure(List(), Literal(20.0))
-    val if_two_then_three_else_four = If(Literal(20.0), fun_ret_1, Literal(4.0))
-    Typer.inferType(if_two_then_three_else_four)
+    val fun_ret_1 = Closure(List(), Literal(2.0))
+    val if_two_then_fun_else_four = If(Literal(2.0), fun_ret_1, Literal(4.0))
+    Typer.inferType(if_two_then_fun_else_four)
   }
 
   @Test def closure() {
