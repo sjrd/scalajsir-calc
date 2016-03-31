@@ -111,15 +111,22 @@ object Compiler {
   }
 
   def closure(t: ClosureT) = { implicit val pos = t.pos
-    val paramDef = t.params map { ident =>
-      irt.ParamDef(irt.Ident(ident.name), ident.tpe.irtype, false, false)
+    val paramBoxed = t.params map { ident =>
+      irt.ParamDef(irt.Ident(ident.name), irtpe.AnyType, false, false)
+    }
+    val paramUnbox = t.params map { ident =>
+      val varRef = irt.VarRef(irt.Ident(ident.name))(irtpe.AnyType)
+      val varUnbox = irt.Unbox(varRef, 'D')
+      irt.VarDef(irt.Ident(ident.name), irtpe.DoubleType, false, varUnbox)
     }
     val body = expr(t.body)
-    irt.Closure(List(), paramDef, body, List())
+    val block = irt.Block(paramUnbox ++ List(body))
+    irt.Closure(List(), paramBoxed, block, List())
   }
 
   def call(t: CallT) = { implicit val pos = t.pos
-    irt.JSFunctionApply(expr(t.fun), t.args map expr)
+    val args = t.args map expr
+    irt.Unbox(irt.JSFunctionApply(expr(t.fun), args), 'D')
   }
 
   private def operatorToIR(op: String) = {
