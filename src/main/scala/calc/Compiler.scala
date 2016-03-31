@@ -78,8 +78,12 @@ object Compiler {
       )
     )
 
-    implicit val env = Typer.emptyEnv ++ foreignEnv
-    expr(Typer.inferType(tree))
+    // Phase 1: Convert AST to Typed AST
+    implicit val typeEnv = Typer.emptyEnv ++ foreignEnv
+    val typedAst = Typer.inferType(tree)
+
+    // Phase 2: Compile Typed AST to IR
+    expr(typedAst)
   }
 
   def expr(t: TreeT): irt.Tree = {
@@ -157,5 +161,19 @@ object Compiler {
       case _ => None
     }
   }
+
+  private def freeVariables(t: TreeT): Set[String] = {
+    case t: IdentT => Set(t.name)
+    case t: LiteralT => Set()
+    case t: BinaryOpT => freeVariables(t.lhs) ++ freeVariables(t.rhs)
+    case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterNot { _ == t.name }
+    case t: IfT => freeVariables(t.cond) ++ freeVariables(t.elsep) ++ freeVariables(t.thenp)
+    case t: ClosureT =>
+      val params = t.params map { _.name }
+      freeVariables(t.body) -- params
+    case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
+    case t: ForeignCallT => t.args flatMap freeVariables
+  }
 }
+
 
