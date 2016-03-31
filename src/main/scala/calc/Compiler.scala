@@ -157,7 +157,7 @@ object Compiler {
     val receiver = irt.LoadModule(irtpe.ClassType(encodeClassName(t.clsName + "$")))
     val method = irt.Ident(t.methodName)
     val args = t.args map expr
-    irt.Apply(receiver, method, args)(t.tpe.irtype)
+    irt.Unbox(irt.Apply(receiver, method, args)(t.tpe.irtype), 'D')
   }
 
   private def operatorToIR(op: String) = {
