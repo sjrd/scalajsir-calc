@@ -77,6 +77,11 @@ class TyperTest {
     assertType(TFun(2), fun_x_y_ret_x)
   }
 
+  @Test(expected = classOf[TypeError]) def closure_body_not_double: Unit = {
+    implicit val env = Typer.emptyEnv
+    Typer.inferType(Closure(List(), Closure(List(), Literal(2.0))))
+  }
+
   @Test def call() {
     val fun_ret_1 = Closure(List(), Literal(20.0))
     val call_0 = Call(fun_ret_1, List())

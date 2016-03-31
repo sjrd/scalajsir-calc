@@ -41,7 +41,8 @@ class RunTest {
 
   @Test def ifElsePlusLet() { implicit val comparison = ApproxDouble
     assertRun(200.0, "let x = 200 in if (x - 200) 100.0 else 200.0")
-    assertRun(4, "let x = if (3) 2 else 1 in x + x" )
+    assertRun(4, "let x = if (3) 2 else 1 in x + x")
+    assertRun(1, "if (let x = 2 in x - 2) 2 else 1")
   }
 
   @Test def closure() { implicit val comparison = ApproxDouble

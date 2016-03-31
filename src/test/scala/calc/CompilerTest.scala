@@ -1,6 +1,7 @@
 package calc
 
 import org.junit.Test
+import org.junit.Assert._
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 import TestHelpers._
@@ -61,6 +62,19 @@ class CompilerTest {
     assertCompile(let_x_eq_100_in_x_plus_x, Let(Ident("x"), Literal(100.0), BinaryOp("+", Ident("x"), Ident("x"))))
   }
 
+  @Test def closure() {
+    val fun_ret_one = irt.Closure(List(), List(), irt.DoubleLiteral(1.0), List())
+    assertCompile(fun_ret_one, Closure(List(), Literal(1.0)))
+
+    val xParam = irt.ParamDef(irt.Ident("x__"), irtpe.AnyType, false, false)
+    val xDef = irt.VarDef(irt.Ident("x"), irtpe.DoubleType, false,
+      irt.Unbox(irt.VarRef(irt.Ident("x__"))(irtpe.DoubleType), 'D'))
+    val xRef = irt.VarRef(irt.Ident("x"))(irtpe.DoubleType)
+    val fun_x_ret_x = irt.Closure(List(), List(xParam), irt.Block(List(xDef, xRef)), List())
+    val got = Compiler.compileExpr(Closure(List(Ident("x")), Ident("x")))
+    assertTrue(got.toString equals fun_x_ret_x.toString)
+  }
+  
   @Test def ifElse() {
     val one = irt.DoubleLiteral(100.0)
     val cond = irt.BinaryOp(irt.BinaryOp.!==, one, irt.DoubleLiteral(0))
