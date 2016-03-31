@@ -52,13 +52,11 @@ class RunTest {
   }
 
   @Test def closureCapturing() { implicit val comparison = ApproxDouble
-    /*
     assertRun(5.0,
       """
         | let f = fun (x, y) = { x + y } in
         | let z = fun () = { f(2, 3) } in z()
       """.stripMargin)
-    */
     assertRun(12.0,
       """
         | let f = fun (x, y) = { x + y } in
