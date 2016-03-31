@@ -44,7 +44,13 @@ class RunTest {
     assertRun(4, "let x = if (3) 2 else 1 in x + x" )
   }
 
-  @Test def closurePlusApply() { implicit val comparison = ApproxDouble
+  @Test def closure() { implicit val comparison = ApproxDouble
+    assertRun(200.0, "(fun () = { 200 })()")
+    assertRun(200.0, "(fun (x, y) = { 200 })(2, 3)")
+    assertRun(200.0, "(fun (x, y) = { x + y })(100, 100)")
+  }
+
+  @Test def closurePlusLet() { implicit val comparison = ApproxDouble
     assertRun(200.0, "let f = fun () = { 200 } in f()")
     assertRun(200.0, "let f = fun (x) = { 200 } in f(400)")
     assertRun(200.0, "let f = fun (x) = { (x - 200) } in f(400)")
