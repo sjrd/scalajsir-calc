@@ -51,6 +51,26 @@ class RunTest {
     assertRun(400.0, "let f = fun (x) = { (x - 200) } in let g = fun (f) = { (f - 200) } in g(400) + f(400)")
   }
 
+  @Test def closureCapturing() { implicit val comparison = ApproxDouble
+    /*
+    assertRun(5.0,
+      """
+        | let f = fun (x, y) = { x + y } in
+        | let z = fun () = { f(2, 3) } in z()
+      """.stripMargin)
+    */
+    assertRun(12.0,
+      """
+        | let f = fun (x, y) = { x + y } in
+        | let z = fun () = {
+        |   let g = fun(x) = {
+        |      x + f(4, 5)
+        |   } in
+        |   g(3)
+        | } in z()
+      """.stripMargin)
+  }
+
   @Test def foreignCall() { implicit val comparison = ApproxDouble
     assertRun(1.0, "cos(0)")
     assertRun(0.0, "sin(0)")

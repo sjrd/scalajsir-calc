@@ -57,7 +57,11 @@ object Typer {
   def closure(t: Closure)(implicit env: TypeEnv) = { implicit val pos = t.pos
     val params = t.params map { p => new IdentT(p.name) { val tpe = TDouble } }
     val body = inferType(t.body)(env ++ (t.params map { _.name -> TDouble }))
-    new ClosureT(params, body) { val tpe = TFun(params.length) }
+    if (body.tpe == TDouble) {
+      new ClosureT(params, body) { val tpe = TFun(params.length) }
+    } else {
+      throw new TypeError(body.pos, TDouble, body.tpe)
+    }
   }
 
   def call(t: Call)(implicit env: TypeEnv): TreeT = { implicit val pos = t.pos

@@ -30,7 +30,7 @@ object TestHelpers {
 
     Runner.run(linked, logger, console)
 
-    comparison match  {
+    comparison match {
       case ExactString => assertEquals(expected.toString(), lines.toString().trim)
       case ApproxDouble => assertEquals(expected, lines.toString().toDouble, epsilon)
     }

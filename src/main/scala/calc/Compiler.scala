@@ -131,6 +131,11 @@ object Compiler {
       val mangled = irt.Ident(mangle(ident.name))
       irt.ParamDef(mangled, irtpe.AnyType, false, false)
     }
+
+    val freeVars = freeVariables(t)
+    val captureParamsRef = freeVars map { v => irt.VarRef(irt.Ident(v._1))(v._2.irtype) } toList
+    val captureParamsDef = freeVars map { v => irt.ParamDef(irt.Ident(v._1), v._2.irtype, false, false) } toList
+
     val paramUnbox = t.params map { ident =>
       val mangled = irt.Ident(mangle(ident.name))
       val varRef = irt.VarRef(mangled)(irtpe.AnyType)
@@ -139,7 +144,8 @@ object Compiler {
     }
     val body = expr(t.body)
     val block = irt.Block(paramUnbox ++ List(body))
-    irt.Closure(List(), paramBoxed, block, List())
+
+    irt.Closure(captureParamsDef, paramBoxed, block, captureParamsRef)
   }
 
   def call(t: CallT) = { implicit val pos = t.pos
@@ -164,24 +170,20 @@ object Compiler {
     }
   }
 
-  private def mangle(name: String): String = name + "__"
+  private def mangle(name: String) = name + "__"
 
-  private def freeVariables(t: TreeT): Set[String] = {
+  private def freeVariables(t: TreeT): Map[String, Type] = {
     t match {
-      case t: IdentT => Set(t.name)
-      case t: LiteralT => Set[String]()
+      case t: IdentT => Map(t.name -> t.tpe)
+      case t: LiteralT => Map.empty
       case t: BinaryOpT => freeVariables(t.lhs) ++ freeVariables(t.rhs)
-      case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterNot {
-        _ == t.name
-      }
+      case t: LetT => (freeVariables(t.value) ++ freeVariables(t.body)) filterKeys { _ != t.name.name }
       case t: IfT => freeVariables(t.cond) ++ freeVariables(t.elsep) ++ freeVariables(t.thenp)
       case t: ClosureT =>
-        val params = t.params map {
-          _.name
-        }
-        freeVariables(t.body) -- params
+        val paramsName = t.params map { _.name }
+        freeVariables(t.body) filterKeys { !paramsName.contains(_) }
       case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
-      case t: ForeignCallT => (t.args flatMap freeVariables).toSet
+      case t: ForeignCallT => (t.args flatMap freeVariables).toMap
     }
   }
 }
