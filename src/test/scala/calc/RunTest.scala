@@ -93,5 +93,9 @@ class RunTest {
 
   @Test def recursive_call() { implicit val comparison = ApproxDouble
     assertRun(24, "let fact = fun(n) = { if (n) (fact(n - 1) * n) else 1 } in fact(4)")
+    assertRun(12,
+      """ let fact = fun(n) = { let fact = 4 in if (n) (fact * n) else 1 } in
+          fact(3)
+      """.stripMargin)
   }
 }

@@ -239,7 +239,11 @@ object Compiler {
         new BinaryOpT(t.op, lhs, rhs) { val tpe = t.tpe }
       case t: LetT =>
         val value = substitute(t.value, name, withTree)
-        val body = substitute(t.body, name, withTree)
+        val body = if (t.name.name != name) {
+          substitute(t.body, name, withTree)
+        } else {
+          t.body
+        }
         new LetT(t.name, value, body) { val tpe = t.tpe }
       case t: IfT =>
         val cond = substitute(t.cond, name, withTree)
