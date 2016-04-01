@@ -119,7 +119,7 @@ object Compiler {
   }
 
   def letBinding(t: LetT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
-    val body = expr(t.body)
+    val body = expr(t.body)(env - t.name.name)
     t.value match {
       case tree:ClosureT =>
         // Create empty object with name f__ref
@@ -160,7 +160,7 @@ object Compiler {
              (implicit env: Foreign.Env) = { implicit val pos = t.pos
     val paramBoxed = boxedParams(t.params)
 
-    val freeVars = freeVariables(t)
+    val freeVars = freeVariables(t) filter { v => !env.isDefinedAt(v._1) }
     val captureParamsRef = freeVars.map({ v => irt.VarRef(irt.Ident(v._1))(v._2.irtype) }).toList
     val recursiveCaptureRef = (recursiveCapture map { kv => kv._2 }).toList
 
@@ -180,18 +180,18 @@ object Compiler {
     irt.Unbox(irt.JSFunctionApply(expr(t.fun), args), 'D')
   }
 
-  def foreignCall(clsName: String, methodName: String, args: List[TreeT], tpe: Type)
+  def foreignCall(clsName: String, methodName: String, args: List[TreeT])
                  (implicit pos: Position, env: Foreign.Env) = {
     val receiver = irt.LoadModule(irtpe.ClassType(encodeClassName(clsName + "$")))
     val method = irt.Ident(methodName)
-    irt.Apply(receiver, method, args map expr)(tpe.irtype)
+    irt.Apply(receiver, method, args map expr)(irtpe.DoubleType)
   }
 
   def etaExpandStaticFunction(func: StaticForeignFunction)(implicit pos: Position, env: Foreign.Env) = {
     val params = (1 to func.tpe.arity).map({ p =>
       new IdentT("a" + p) { val tpe = TDouble }
     }).toList
-    val body = foreignCall(func.clsName, func.methodName, params, func.tpe)
+    val body = foreignCall(func.clsName, func.methodName, params)
     val paramsBoxed = boxedParams(params)
     val paramsUnboxed = unboxedParams(params)
     val block = irt.Block(paramsUnboxed ++ List(body))
