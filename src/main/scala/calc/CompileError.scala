@@ -44,4 +44,11 @@ case class InvalidNumberOfArgument(pos: Position, expected: Int, got: Int) exten
      """.stripMargin
   }
 }
+case class ParameterRedeclaration(pos: Position, param: String) extends CompileError {
+  override def toString(): String = {
+    s"""
+       | Parameter $param is re-declared at line ${pos.line}, column ${pos.column}
+     """.stripMargin
+  }
+}
 

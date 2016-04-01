@@ -72,6 +72,14 @@ object Typer {
   }
 
   def closure(t: Closure)(implicit env: TypeEnv) = { implicit val pos = t.pos
+    // Ensure all params are unique
+    val paramSet = t.params.map({ _.name }).toSet
+    paramSet foreach { p =>
+      if (t.params.count({ _.name == p }) > 1) {
+        throw new ParameterRedeclaration(pos, p)
+      }
+    }
+
     val params = t.params map { p => new IdentT(p.name) { val tpe = TDouble } }
     val (body, subs) = inferType(t.body)(env ++ (t.params map { _.name -> TDouble }))
     if (body.tpe == TDouble) {

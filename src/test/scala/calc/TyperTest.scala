@@ -81,6 +81,11 @@ class TyperTest {
     Typer.inferType(Closure(List(), Closure(List(), Literal(2.0))))
   }
 
+  @Test(expected = classOf[ParameterRedeclaration]) def closure_parameter_not_unique: Unit = {
+    implicit val env = Typer.emptyEnv
+    Typer.inferType(Closure(List(Ident("x"), Ident("x")), Literal(2.0)))
+  }
+
   @Test def call() {
     val fun_ret_1 = Closure(List(), Literal(20.0))
     val call_0 = Call(fun_ret_1, List())
