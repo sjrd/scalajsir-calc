@@ -1,7 +1,7 @@
 package calc
 
 import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
+import ir.{Position, Trees => irt, Types => irtpe}
 import ir.Definitions._
 
 /** Main compiler.
@@ -68,7 +68,7 @@ object Compiler {
   def compileExpr(tree: Tree, etaExpansion: Boolean = true): irt.Tree = {
     implicit val pos = tree.pos
 
-    val foreignEnv = Foreign.staticJavaMethods(
+    val (foreignTypeEnv, foreignEnv) = Foreign.staticJavaMethods(
       clsName = "java.lang.Math",
       importedMethods = List(
         ("sin", TFun(1)),
@@ -79,21 +79,15 @@ object Compiler {
     )
 
     // Phase 1: Convert AST to Typed AST
-    implicit val typeEnv = Typer.emptyEnv ++ foreignEnv
+    implicit val typeEnv = Typer.emptyEnv ++ foreignTypeEnv
     val (typedAst, _) = Typer.inferType(tree)
 
     // Phase 2: Compile Typed AST to IR
-    val ir = expr(typedAst)
-
-    // Phase 3: Prepend Eta expansion of foreign method to IR
-    if (etaExpansion) {
-      Foreign.prependEtaExpansion(ir, foreignEnv)
-    } else {
-      ir
-    }
+    implicit val foreignImportEnv = foreignEnv
+    expr(typedAst)
   }
 
-  def expr(t: TreeT): irt.Tree = {
+  def expr(t: TreeT)(implicit env: Foreign.Env): irt.Tree = {
     t match {
       case t: IdentT => ident(t)
       case t: LiteralT => literal(t)
@@ -102,25 +96,29 @@ object Compiler {
       case t: IfT => ifElse(t)
       case t: ClosureT => closure(t)
       case t: CallT => call(t)
-      case t: ForeignCallT => foreignCall(t)
       case t: SelectT => select(t)
     }
   }
 
-  def ident(t: IdentT): irt.Tree = { implicit val pos = t.pos
-    irt.VarRef(irt.Ident(t.name))(t.tpe.irtype)
+  def ident(t: IdentT)(implicit env: Foreign.Env): irt.Tree = { implicit val pos = t.pos
+    env.get(t.name) match {
+      case Some(func) => func match {
+        case func:StaticForeignFunction => etaExpandStaticFunction(func)
+      }
+      case None => irt.VarRef(irt.Ident(t.name))(t.tpe.irtype)
+    }
   }
 
-  def literal(t: LiteralT) = { implicit val pos = t.pos
+  def literal(t: LiteralT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
     irt.DoubleLiteral(t.value)
   }
 
-  def binaryOp(t: BinaryOpT) = { implicit val pos = t.pos
+  def binaryOp(t: BinaryOpT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
     val irOp = operatorToIR(t.op) getOrElse (throw UnknownOperator(pos, t.op))
     irt.BinaryOp(irOp, expr(t.lhs), expr(t.rhs))
   }
 
-  def letBinding(t: LetT) = { implicit val pos = t.pos
+  def letBinding(t: LetT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
     val body = expr(t.body)
     t.value match {
       case tree:ClosureT =>
@@ -151,18 +149,16 @@ object Compiler {
     }
   }
 
-  def ifElse(t: IfT) = { implicit val pos = t.pos
+  def ifElse(t: IfT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
     val cond = irt.BinaryOp(irt.BinaryOp.!==, expr(t.cond), irt.DoubleLiteral(0))
     val thenp = expr(t.thenp)
     val elsep = expr(t.elsep)
     irt.If(cond, thenp, elsep)(t.tpe.irtype)
   }
 
-  def closure(t: ClosureT, recursiveCapture: Option[(String, irt.VarRef)] = None) = { implicit val pos = t.pos
-    val paramBoxed = t.params map { ident =>
-      val mangled = irt.Ident(mangle(ident.name))
-      irt.ParamDef(mangled, irtpe.AnyType, false, false)
-    }
+  def closure(t: ClosureT, recursiveCapture: Option[(String, irt.VarRef)] = None)
+             (implicit env: Foreign.Env) = { implicit val pos = t.pos
+    val paramBoxed = boxedParams(t.params)
 
     val freeVars = freeVariables(t)
     val captureParamsRef = freeVars.map({ v => irt.VarRef(irt.Ident(v._1))(v._2.irtype) }).toList
@@ -171,12 +167,7 @@ object Compiler {
     val captureParamsDef = freeVars.map({ v => irt.ParamDef(irt.Ident(v._1), v._2.irtype, false, false) }).toList
     val recursiveCaptureDef = (recursiveCapture map { kv => irt.ParamDef(irt.Ident(kv._1), irtpe.AnyType, false, false) }).toList
 
-    val paramUnbox = t.params map { ident =>
-      val mangled = irt.Ident(mangle(ident.name))
-      val varRef = irt.VarRef(mangled)(irtpe.AnyType)
-      val varUnbox = irt.Unbox(varRef, 'D')
-      irt.VarDef(irt.Ident(ident.name), irtpe.DoubleType, false, varUnbox)
-    }
+    val paramUnbox = unboxedParams(t.params)
     val body = expr(t.body)
     val block = irt.Block(paramUnbox ++ List(body))
 
@@ -184,16 +175,27 @@ object Compiler {
       captureParamsRef ++ recursiveCaptureRef)
   }
 
-  def call(t: CallT) = { implicit val pos = t.pos
+  def call(t: CallT)(implicit env: Foreign.Env) = { implicit val pos = t.pos
     val args = t.args map expr
     irt.Unbox(irt.JSFunctionApply(expr(t.fun), args), 'D')
   }
 
-  def foreignCall(t: ForeignCallT) = { implicit val pos = t.pos
-    val receiver = irt.LoadModule(irtpe.ClassType(encodeClassName(t.clsName + "$")))
-    val method = irt.Ident(t.methodName)
-    val args = t.args map expr
-    irt.Unbox(irt.Apply(receiver, method, args)(t.tpe.irtype), 'D')
+  def foreignCall(clsName: String, methodName: String, args: List[TreeT], tpe: Type)
+                 (implicit pos: Position, env: Foreign.Env) = {
+    val receiver = irt.LoadModule(irtpe.ClassType(encodeClassName(clsName + "$")))
+    val method = irt.Ident(methodName)
+    irt.Apply(receiver, method, args map expr)(tpe.irtype)
+  }
+
+  def etaExpandStaticFunction(func: StaticForeignFunction)(implicit pos: Position, env: Foreign.Env) = {
+    val params = (1 to func.tpe.arity).map({ p =>
+      new IdentT("a" + p) { val tpe = TDouble }
+    }).toList
+    val body = foreignCall(func.clsName, func.methodName, params, func.tpe)
+    val paramsBoxed = boxedParams(params)
+    val paramsUnboxed = unboxedParams(params)
+    val block = irt.Block(paramsUnboxed ++ List(body))
+    irt.Closure(Nil, paramsBoxed, block, Nil)
   }
 
   private def operatorToIR(op: String) = {
@@ -224,7 +226,22 @@ object Compiler {
         val paramsName = t.params map { _.name }
         freeVariables(t.body) filterKeys { !paramsName.contains(_) }
       case t: CallT => freeVariables(t.fun) ++ (t.args flatMap freeVariables)
-      case t: ForeignCallT => (t.args flatMap freeVariables).toMap
+    }
+  }
+
+  private def boxedParams(params: List[IdentT])(implicit pos: Position) = {
+    params map { ident =>
+      val mangled = irt.Ident(mangle(ident.name))
+      irt.ParamDef(mangled, irtpe.AnyType, false, false)
+    }
+  }
+
+  private def unboxedParams(params: List[IdentT])(implicit pos: Position) = {
+    params map { ident =>
+      val mangled = irt.Ident(mangle(ident.name))
+      val varRef = irt.VarRef(mangled)(irtpe.AnyType)
+      val varUnbox = irt.Unbox(varRef, 'D')
+      irt.VarDef(irt.Ident(ident.name), irtpe.DoubleType, false, varUnbox)
     }
   }
 
@@ -262,9 +279,6 @@ object Compiler {
         val fun = substitute(t.fun, name, withTree)
         val args = t.args map { substitute(_, name, withTree) }
         new CallT(fun, args) { val tpe = t.tpe }
-      case t: ForeignCallT =>
-        val args = t.args map { substitute(_, name, withTree) }
-        new ForeignCallT(t.clsName, t.methodName, args) { val tpe = t.tpe }
     }
   }
 }

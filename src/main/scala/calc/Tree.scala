@@ -18,14 +18,6 @@ case class TFun(arity: Int) extends Type {
   def irtype = irtpe.AnyType
 }
 
-case class TStaticForeignFun(clsName: String, method: String, arity: Int) extends Type {
-  def irtype = irtpe.AnyType
-  override def equals(o: Any) = o match {
-    case that: TStaticForeignFun => this.arity == that.arity
-    case _ => false
-  }
-}
-
 sealed abstract class Tree {
   def pos: Position
 }
@@ -70,9 +62,6 @@ abstract case class ClosureT(params: List[IdentT], body: TreeT)(
   implicit val pos: Position) extends TreeT
 
 abstract case class CallT(fun: TreeT, args: List[TreeT])(
-  implicit val pos: Position) extends TreeT
-
-abstract case class ForeignCallT(clsName: String, methodName: String, args: List[TreeT])(
   implicit val pos: Position) extends TreeT
 
 abstract case class IfT(cond: TreeT, thenp: TreeT, elsep: TreeT)(

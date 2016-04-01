@@ -3,36 +3,22 @@ package calc
 import org.scalajs.core.ir
 import ir.{Trees => irt, Types => irtpe}
 
-object Foreign {
+sealed trait ForeignImport
+case class StaticForeignFunction(clsName: String, methodName: String, tpe: TFun) extends ForeignImport
 
-  // Return a type environment extension from foreign functions information
-  def staticJavaMethods(clsName: String, importedMethods: List[(String, TFun)]): Typer.TypeEnv = {
-    importedMethods.foldLeft(Typer.emptyEnv) { (env, value) =>
+object Foreign {
+  type Env = Map[String, ForeignImport]
+
+  def emptyEnv = Map.empty[String, ForeignImport]
+
+  // Return a pair of type and foreign function environments by importing static methods
+  def staticJavaMethods(clsName: String, importedMethods: List[(String, TFun)]): (Typer.TypeEnv, Env) = {
+    importedMethods.foldLeft(Typer.emptyEnv, emptyEnv) { (env, value) =>
+      val (typeEnv, foreignEnv) = env
       val (name, tpe) = value
       val mangled = name + ("__D" * (tpe.arity + 1))
-      val foreignTpe = TStaticForeignFun(clsName, mangled, tpe.arity)
-      env + (name -> foreignTpe)
+      val foreignTpe = StaticForeignFunction(clsName, mangled, tpe)
+      (typeEnv + (name -> tpe), foreignEnv + (name -> foreignTpe))
     }
-  }
-
-  // Returns a new IR tree prepended with eta expansion for all functions defined in typeEnv
-  def prependEtaExpansion(ir: irt.Tree, typeEnv: Typer.TypeEnv): irt.Tree = {
-    implicit val env = typeEnv
-    implicit val pos = ir.pos
-    val definitions: List[irt.Tree] = typeEnv.foldRight(List.empty[irt.Tree]) { (kv, acc) =>
-      val (name, tpe) = kv
-      tpe match {
-        case t:TStaticForeignFun => {
-          val params = (1 to t.arity).map({ n => Ident("a__" + n) }).toList
-          val closure = Closure(params, Call(Ident(name), params))
-          val (typedClosure, _) = Typer.closure(closure)
-          val compiledClosure = Compiler.closure(typedClosure)
-          val definition = irt.VarDef(irt.Ident(name), irtpe.AnyType, false, compiledClosure)
-          definition :: acc
-        }
-        case _ => acc
-      }
-    }
-    irt.Block(definitions ++ List(ir))
   }
 }

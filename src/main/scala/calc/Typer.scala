@@ -116,14 +116,6 @@ object Typer {
         } else {
           (new CallT(funType, typedArgs) { val tpe = TDouble }, subs2)
         }
-      case TStaticForeignFun(clsName, methodName, arity) =>
-        val calleeArity = t.args.length
-        // Quick exit if parameter length does not match
-        if (arity != calleeArity) {
-          throw new InvalidNumberOfArgument(pos, arity, calleeArity)
-        } else {
-          (new ForeignCallT(clsName, methodName, typedArgs) { val tpe = TDouble }, subs2)
-        }
       case other =>
         throw new TypeError(funType.pos, TFun(t.args.length), other)
     }
