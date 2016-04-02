@@ -35,8 +35,6 @@ object Typer {
   }
 
   def letBinding(t: Let)(implicit env: TypeEnv) = { implicit val pos = t.pos
-    // In case of recursive function, use wildcard first, instantiate later if possible.
-    // e.g if we found f(1) -> instantiate to TFun(1) and resume inference
     t.value match {
       case v:Closure =>
         val newEnv = env + (t.name.name -> TFun(v.params.size))
