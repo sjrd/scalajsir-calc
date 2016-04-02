@@ -123,22 +123,26 @@ object Compiler {
     t.value match {
       case tree:ClosureT =>
         // Create empty object with name f__ref
-        val emptyObject = irt.JSObjectConstr(List())
+        val moduleName = irtpe.ClassType(encodeClassName("scala.runtime.ObjectRef$"))
+        val classType = irtpe.ClassType(encodeClassName("scala.runtime.ObjectRef"))
+        val module = irt.LoadModule(moduleName)
+        val zeroId = "zero__sr_ObjectRef"
+        val emptyObject = irt.Apply(module, irt.Ident(zeroId), Nil)(classType)
         val bindingName = t.name.name
         val objectName = irt.Ident(bindingName + "__ref")
-        val objectDef = irt.VarDef(objectName, irtpe.AnyType, false, emptyObject)
+        val objectDef = irt.VarDef(objectName, classType, false, emptyObject)
 
         // Do f__ref.func = f
-        val objectRef = irt.VarRef(objectName)(irtpe.AnyType)
-        val dotSelect = irt.JSDotSelect(objectRef, irt.Ident("func"))
+        val objectRef = irt.VarRef(objectName)(classType)
+        val dotSelect = irt.JSDotSelect(objectRef, irt.Ident("elem$f"))
         val recursiveCapture = Some(objectName.name, objectRef)
 
         // Substitute f with f__ref.func in closure body
-        val newBody = substitute(tree, t.name.name, new SelectT(objectName.name, "func") { val tpe = tree.tpe })
+        val newBody = substitute(tree, t.name.name, new SelectT(objectName.name, "elem$f") { val tpe = tree.tpe })
         val assign = irt.Assign(dotSelect, closure(newBody.asInstanceOf[ClosureT], recursiveCapture))
 
         // Do the binding, i.e f = f__ref.func
-        val attrAccess = irt.JSDotSelect(objectRef, irt.Ident("func"))
+        val attrAccess = irt.JSDotSelect(objectRef, irt.Ident("elem$f"))
         val binding = irt.VarDef(irt.Ident(bindingName), t.value.tpe.irtype, false, attrAccess)
         irt.Block(List(objectDef, assign, binding, body))
       case _ => {
