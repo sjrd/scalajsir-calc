@@ -59,7 +59,7 @@ object TestHelpers {
 
   def assertType(expected: Type, sourceTree: Tree): Unit = {
     implicit val env = Typer.emptyEnv
-    val actual = Typer.inferType(sourceTree)._1.tpe
+    val actual = Typer.inferType(sourceTree).tpe
     assertTrue(s"Expected $expected but got $actual", actual == expected)
   }
 }

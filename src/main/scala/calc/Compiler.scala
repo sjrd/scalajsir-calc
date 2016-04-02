@@ -80,7 +80,7 @@ object Compiler {
 
     // Phase 1: Convert AST to Typed AST
     implicit val typeEnv = Typer.emptyEnv ++ foreignTypeEnv
-    val (typedAst, _) = Typer.inferType(tree)
+    val typedAst = Typer.inferType(tree)
 
     // Phase 2: Compile Typed AST to IR
     implicit val foreignImportEnv = foreignEnv
