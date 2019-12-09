@@ -1,32 +1,36 @@
 name := "scalajsir-calc"
-scalaVersion := "2.11.8"
+scalaVersion := "2.13.1"
 version := "0.1-SNAPSHOT"
 
 scalacOptions ++= Seq(
     "-deprecation", "-feature", "-unchecked", "-encoding", "utf-8")
 
-val scalaJSVersion = "0.6.8"
+val scalaJSVersion = "1.0.0-RC1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value,
-  "org.scala-js" %% "scalajs-tools" % scalaJSVersion,
-  "org.scala-js" %% "scalajs-js-envs" % scalaJSVersion,
-  "com.lihaoyi" %% "fastparse" % "0.3.7",
-  
-  "com.novocode" % "junit-interface" % "0.9" % "test"
+  "org.scala-js" %% "scalajs-linker" % scalaJSVersion,
+  "org.scala-js" %% "scalajs-env-nodejs" % scalaJSVersion,
+  "com.lihaoyi" %% "fastparse" % "2.1.3",
+
+  "com.novocode" % "junit-interface" % "0.9" % "test",
+  "org.scala-js" %% "scalajs-js-envs-test-kit" % scalaJSVersion,
 )
 
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v", "-a")
 
-// Some magic to add the scalajs-library.jar in the resources
-ivyConfigurations += config("linkingdeps").hide
+fork := true
+
+// Some magic to pass -Dcalc.scalajslib=/path/to/scalajs-library.jar
+val LinkingDeps = config("linkingdeps").hide
+ivyConfigurations += LinkingDeps
 libraryDependencies +=
   "org.scala-js" %% "scalajs-library" % scalaJSVersion % "linkingdeps"
-resourceGenerators in Compile += Def.task {
+javaOptions += {
   val jars = update.value.select(configurationFilter("linkingdeps"))
-  for (jar <- jars) yield {
-    val dest = (resourceManaged in Compile).value / "calc" / jar.getName
-    IO.copyFile(jar, dest, preserveLastModified = true)
-    dest
+  val scalajslibJar = jars.find(_.getName.startsWith("scalajs-library")).getOrElse {
+    throw new NoSuchElementException(
+        s"Did not find scalajs-library in $jars")
   }
-}.taskValue
+  "-Dcalc.scalajslib=" + scalajslibJar.getAbsolutePath.toString
+}

@@ -1,6 +1,6 @@
 package calc
 
-import org.scalajs.core.ir.Position
+import org.scalajs.ir.Position
 
 sealed abstract class Tree {
   def pos: Position

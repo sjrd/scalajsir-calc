@@ -1,14 +1,16 @@
 package calc
 
-import fastparse.core.Parsed
+import java.nio.file.Path
 
-import org.scalajs.core.ir
-import ir.Printers._
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
-import org.scalajs.core.tools.logging._
-import org.scalajs.core.tools.io._
-import org.scalajs.core.tools.jsdep.ResolvedJSDependency
+import fastparse.Parsed
 
+import org.scalajs.ir
+import org.scalajs.ir.Printers._
+
+import org.scalajs.logging._
 import org.scalajs.jsenv._
 
 /** Main object of the calculator.
@@ -47,18 +49,26 @@ object Main {
     val writer = new java.io.PrintWriter(System.out)
     try {
       val printer = new IRTreePrinter(writer)
-      printer.printTopLevelTree(classDef)
+      printer.print(classDef)
+      writer.println()
     } finally {
       writer.flush()
     }
 
-    val linked = Linker.link(classDef, new ScalaConsoleLogger)
+    val linked = Linker.link(classDef, new ScalaConsoleLogger(Level.Info))
 
     // Clearly separate the output of the program from the compiling logs
-    println("")
-    println("")
+    println()
+    println()
 
-    Runner.run(linked, NullLogger, ConsoleJSConsole)
+    run(linked)
+  }
+
+  private def run(jsFile: Path): Unit = {
+    val jsEnv = new nodejs.NodeJSEnv()
+    val input = Seq(Input.Script(jsFile))
+    val runConfig = RunConfig().withLogger(NullLogger)
+    Await.result(jsEnv.start(input, runConfig).future, Duration.Inf)
   }
 
 }

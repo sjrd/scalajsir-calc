@@ -1,14 +1,21 @@
 package calc
 
-import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
-import ir.Definitions._
+import org.scalajs.ir
+import org.scalajs.ir.{Trees => irt, Types => irtpe}
+import org.scalajs.ir.Names._
+import org.scalajs.ir.OriginalName.NoOriginalName
 
 /** Main compiler.
  *
  *  You have to implement the method `compileExpr`.
  */
 object Compiler {
+  private val EMF = irt.MemberFlags.empty
+  private val EAF = irt.ApplyFlags.empty
+
+  private val mainDoubleMethodName = MethodName("main", Nil, irtpe.DoubleRef)
+  private val mainVoidMethodName = MethodName("main", Nil, irtpe.VoidRef)
+
   final val MainObjectFullName = "main.Main"
 
   private final val MainClassFullName = MainObjectFullName + "$"
@@ -18,44 +25,55 @@ object Compiler {
    *  You do not need to modify this method.
    */
   def compileMainClass(tree: Tree): irt.ClassDef = {
+    import irt.MemberNamespace.Constructor
+
     implicit val pos = tree.pos
 
-    val className = encodeClassName(MainClassFullName)
+    val className = ClassName(MainClassFullName)
     val classType = irtpe.ClassType(className)
 
-    val ctorDef = irt.MethodDef(static = false,
-        irt.Ident("init___", Some("<init>")), Nil, irtpe.NoType,
-        irt.Block(List(
-            irt.ApplyStatically(irt.This()(classType),
-                irtpe.ClassType(ObjectClass),
-                irt.Ident("init___", Some("<init>")),
+    val ctorDef = irt.MethodDef(EMF.withNamespace(Constructor),
+        irt.MethodIdent(NoArgConstructorName), NoOriginalName, Nil, irtpe.NoType,
+        Some(irt.Block(List(
+            irt.ApplyStatically(EAF.withConstructor(true), irt.This()(classType),
+                ObjectClass,
+                irt.MethodIdent(NoArgConstructorName),
                 Nil)(
                 irtpe.NoType),
-            irt.StoreModule(classType, irt.This()(classType)))))(
+            irt.StoreModule(className, irt.This()(classType))))))(
         irt.OptimizerHints.empty, None)
 
     val body = compileExpr(tree)
-    val methodDef = irt.MethodDef(static = false,
-        irt.Ident("main__D", Some("main")), Nil, irtpe.DoubleType, body)(
+    val methodDef = irt.MethodDef(EMF,
+        irt.MethodIdent(mainDoubleMethodName), NoOriginalName, Nil,
+        irtpe.DoubleType, Some(body))(
         irt.OptimizerHints.empty, None)
 
-    val exportedMethodDef = irt.MethodDef(static = false,
-        irt.StringLiteral("main"), Nil, irtpe.AnyType,
-        irt.Apply(irt.This()(classType), irt.Ident("main__D", Some("main")),
-            Nil)(irtpe.DoubleType))(
+    val mainMethodDef = irt.MethodDef(EMF,
+        irt.MethodIdent(mainVoidMethodName), NoOriginalName, Nil, irtpe.NoType,
+        Some {
+          val result = irt.Apply(EAF, irt.This()(classType),
+              irt.MethodIdent(mainDoubleMethodName), Nil)(irtpe.DoubleType)
+          irt.JSMethodApply(
+              irt.JSGlobalRef("console"),
+              irt.StringLiteral("log"),
+              List(result))
+        })(
         irt.OptimizerHints.empty, None)
 
-    val exportedModuleDef = irt.ModuleExportDef(MainObjectFullName)
-
-    val allDefs = List(ctorDef, methodDef, exportedMethodDef, exportedModuleDef)
+    val allDefs = List(ctorDef, methodDef, mainMethodDef)
 
     val classDef = irt.ClassDef(
-        irt.Ident(className),
+        irt.ClassIdent(className),
+        NoOriginalName,
         ir.ClassKind.ModuleClass,
-        Some(irt.Ident(ObjectClass)),
+        None,
+        Some(irt.ClassIdent(ObjectClass)),
         Nil,
         None,
-        allDefs)(
+        None,
+        allDefs,
+        Nil)(
         irt.OptimizerHints.empty)
 
     ir.Hashers.hashClassDef(classDef)

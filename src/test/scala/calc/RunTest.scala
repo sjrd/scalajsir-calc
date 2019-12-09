@@ -1,15 +1,21 @@
 package calc
 
+import java.util.concurrent.TimeUnit
+
+import scala.concurrent.duration.Duration
+
 import org.junit.Test
 import org.junit.Assert._
 
-import org.scalajs.core.ir
-import ir.{Trees => irt, Types => irtpe}
-import ir.Definitions._
+import org.scalajs.ir
+import org.scalajs.ir.{Trees => irt, Types => irtpe}
+import org.scalajs.ir.Names._
 
-import org.scalajs.core.tools.logging._
+import org.scalajs.logging._
 
-import org.scalajs.jsenv.JSConsole
+import org.scalajs.jsenv._
+import org.scalajs.jsenv.nodejs.NodeJSEnv
+import org.scalajs.jsenv.test.kit.TestKit
 
 /** End-to-end tests, with parsing, compiling and running.
  *
@@ -18,20 +24,19 @@ import org.scalajs.jsenv.JSConsole
  *  result.
  */
 class RunTest {
+  private val kit = new TestKit(new NodeJSEnv(), Duration(5L, TimeUnit.SECONDS))
 
   private def assertRun(expected: Double, code: String): Unit = {
     val tree = Parser.parse(code).get.value
     val classDef = Compiler.compileMainClass(tree)
-    val linked = Linker.link(classDef, NullLogger)
+    val linked = Linker.link(classDef, new ScalaConsoleLogger(Level.Error))
+    val input = Seq(Input.Script(linked))
 
-    val lines = new java.io.StringWriter
-    val console = new JSConsole {
-      def log(msg: Any): Unit = lines.append(msg.toString() + "\n")
+    kit.withRun(input) { run =>
+      run
+        .expectOut(expected.toString() + "\n")
+        .closeRun()
     }
-
-    Runner.run(linked, NullLogger, console)
-
-    assertEquals(expected.toString(), lines.toString().trim)
   }
 
   @Test def runLiteral(): Unit = {

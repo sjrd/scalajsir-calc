@@ -1,11 +1,21 @@
 package calc
 
-import org.scalajs.core.ir
-import ir.Printers._
+import java.nio.file.Path
 
-import org.scalajs.core.tools.logging._
-import org.scalajs.core.tools.io._
-import org.scalajs.core.tools.linker.{Linker => ScalaJSLinker, _}
+import scala.concurrent._
+import scala.concurrent.duration.Duration
+
+import com.google.common.jimfs.Jimfs
+
+import org.scalajs.ir
+import org.scalajs.ir.Printers._
+import org.scalajs.ir.Trees.ClassDef
+
+import org.scalajs.logging._
+
+import org.scalajs.linker.interface._
+import org.scalajs.linker._
+import org.scalajs.linker.interface.unstable.IRFileImpl
 
 /** The linker, to produce something runnable from the output of the compiler.
  *
@@ -13,44 +23,44 @@ import org.scalajs.core.tools.linker.{Linker => ScalaJSLinker, _}
  */
 object Linker {
 
-  private val libraryIRFiles = {
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  private lazy val libraryIRFiles = {
     // Load the standard library
-    val libraryName = "scalajs-library_2.11-0.6.8.jar"
-    val libraryJarStream = getClass.getResourceAsStream(libraryName)
-    val libraryBytes = try {
-      scala.reflect.io.Streamable.bytes(libraryJarStream)
-    } finally {
-      libraryJarStream.close()
+    val libraryPathStr = System.getProperty("calc.scalajslib")
+    val libraryPath = new java.io.File(libraryPathStr).toPath()
+    val cache = StandardImpl.irFileCache().newCache
+    val future = PathIRContainer.fromClasspath(Seq(libraryPath)).flatMap {
+      pair => cache.cached(pair._1)
     }
-    val libraryVirtualFile = {
-      (new MemVirtualBinaryFile(libraryName) with VirtualJarFile)
-        .withContent(libraryBytes)
-        .withVersion(Some(libraryName)) // unique
-    }
-    val cache = (new IRFileCache).newCache
-    cache.cached(List(IRFileCache.IRContainer.Jar(libraryVirtualFile)))
+    Await.result(future, Duration.Inf)
   }
 
-  def link(classDef: ir.Trees.ClassDef, logger: Logger): VirtualJSFile = {
-    // Put the `classDef` in a virtual file
-    val mainIRFile = {
-      new VirtualScalaJSIRFile {
-        def path: String = "main.sjsir"
-        def exists: Boolean = true
-
-        val infoAndTree: (ir.Infos.ClassInfo, ir.Trees.ClassDef) =
-          (ir.Infos.generateClassInfo(classDef), classDef)
-      }
-    }
-
+  def link(classDef: ClassDef, logger: Logger): Path = {
+    val mainIRFile = new ClassDefIRFileImpl("main.sjsir", None, classDef)
     val allIRFiles = libraryIRFiles :+ mainIRFile
+    val config = StandardConfig().withCheckIR(true)
+    val linker = StandardImpl.linker(config)
 
-    val linker = ScalaJSLinker(
-        frontendConfig = frontend.LinkerFrontend.Config().withCheckIR(true))
-
-    val output = WritableMemVirtualJSFile("output.js")
-    linker.link(allIRFiles, output, logger)
+    val output = Jimfs.newFileSystem().getPath("output.js")
+    val future = linker.link(allIRFiles,
+        List(ModuleInitializer.mainMethod(Compiler.MainObjectFullName, "main")),
+        LinkerOutput(PathOutputFile(output)), logger)
+    Await.result(future, Duration.Inf)
     output
+  }
+
+  /** A simple in-memory IR file containing a `ClassDef`. */
+  private final class ClassDefIRFileImpl(
+      path: String,
+      version: Option[String],
+      classDef: ClassDef
+  ) extends IRFileImpl(path, version) {
+    def entryPointsInfo(implicit ec: ExecutionContext): Future[ir.EntryPointsInfo] =
+      Future.successful(ir.EntryPointsInfo.forClassDef(classDef))
+
+    def tree(implicit ec: ExecutionContext): Future[ClassDef] =
+      Future.successful(classDef)
   }
 
 }
