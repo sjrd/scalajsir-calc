@@ -1,0 +1,16 @@
+sudo: false
+language: scala
+script:
+  - sbt ++$TRAVIS_SCALA_VERSION 'run 42' test
+scala:
+  - 2.13.1
+jdk:
+  - openjdk8
+
+cache:
+  directories:
+    - "$HOME/.coursier/cache"
+    - "$HOME/.sbt"
+before_cache:
+  # Cleanup the cached directories to avoid unnecessary cache updates
+  - find $HOME/.sbt -name "*.lock" -print -delete
