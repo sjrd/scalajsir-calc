@@ -74,7 +74,7 @@ object Parser {
 
     private def expr[_: P] = P(ifThenElse | let | fun | addSub)
 
-    private def parens[_: P]: P[Tree] = P("(" ~/ addSub ~ ")")
+    private def parens[_: P]: P[Tree] = P("(" ~/ expr ~ ")")
 
     private def base[_: P]: P[Tree] = P(
         literal | identifier | parens
