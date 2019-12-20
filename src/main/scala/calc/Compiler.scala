@@ -11,14 +11,13 @@ import org.scalajs.ir.OriginalName.NoOriginalName
  */
 object Compiler {
   private val EMF = irt.MemberFlags.empty
+  private val SMF = EMF.withNamespace(irt.MemberNamespace.PublicStatic)
   private val EAF = irt.ApplyFlags.empty
 
   private val mainDoubleMethodName = MethodName("main", Nil, irtpe.DoubleRef)
   private val mainVoidMethodName = MethodName("main", Nil, irtpe.VoidRef)
 
-  final val MainObjectFullName = "main.Main"
-
-  private final val MainClassFullName = MainObjectFullName + "$"
+  final val MainClassFullName = "main.Main"
 
   /** Compile an expression tree into a full `ClassDef`.
    *
@@ -32,27 +31,31 @@ object Compiler {
     val className = ClassName(MainClassFullName)
     val classType = irtpe.ClassType(className)
 
+    // constructor def <init>() = this.java.lang.Object::<init>()
     val ctorDef = irt.MethodDef(EMF.withNamespace(Constructor),
         irt.MethodIdent(NoArgConstructorName), NoOriginalName, Nil, irtpe.NoType,
-        Some(irt.Block(List(
-            irt.ApplyStatically(EAF.withConstructor(true), irt.This()(classType),
-                ObjectClass,
-                irt.MethodIdent(NoArgConstructorName),
-                Nil)(
-                irtpe.NoType),
-            irt.StoreModule(className, irt.This()(classType))))))(
+        Some {
+          irt.ApplyStatically(EAF.withConstructor(true), irt.This()(classType),
+              ObjectClass,
+              irt.MethodIdent(NoArgConstructorName),
+              Nil)(
+              irtpe.NoType)
+        })(
         irt.OptimizerHints.empty, None)
 
+    // def main(): double = <your compiled expression>
     val body = compileExpr(tree)
     val methodDef = irt.MethodDef(EMF,
         irt.MethodIdent(mainDoubleMethodName), NoOriginalName, Nil,
         irtpe.DoubleType, Some(body))(
         irt.OptimizerHints.empty, None)
 
-    val mainMethodDef = irt.MethodDef(EMF,
+    // static def main(): void = global:console.log(new Main().main())
+    val mainMethodDef = irt.MethodDef(SMF,
         irt.MethodIdent(mainVoidMethodName), NoOriginalName, Nil, irtpe.NoType,
         Some {
-          val result = irt.Apply(EAF, irt.This()(classType),
+          val result = irt.Apply(EAF,
+              irt.New(className, irt.MethodIdent(NoArgConstructorName), Nil),
               irt.MethodIdent(mainDoubleMethodName), Nil)(irtpe.DoubleType)
           irt.JSMethodApply(
               irt.JSGlobalRef("console"),
@@ -66,7 +69,7 @@ object Compiler {
     val classDef = irt.ClassDef(
         irt.ClassIdent(className),
         NoOriginalName,
-        ir.ClassKind.ModuleClass,
+        ir.ClassKind.Class,
         None,
         Some(irt.ClassIdent(ObjectClass)),
         Nil,

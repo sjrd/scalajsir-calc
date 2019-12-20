@@ -44,7 +44,7 @@ object Linker {
 
     val output = Jimfs.newFileSystem().getPath("output.js")
     val future = linker.link(allIRFiles,
-        List(ModuleInitializer.mainMethod(Compiler.MainObjectFullName, "main")),
+        List(ModuleInitializer.mainMethod(Compiler.MainClassFullName, "main")),
         LinkerOutput(PathOutputFile(output)), logger)
     Await.result(future, Duration.Inf)
     output

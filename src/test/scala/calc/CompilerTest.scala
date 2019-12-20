@@ -17,8 +17,7 @@ class CompilerTest {
 
   private implicit val DummyPos = ir.Position.NoPosition
 
-  private val MainObjectFullName = Compiler.MainObjectFullName
-  private val MainClassFullName = MainObjectFullName + "$"
+  private val MainClassFullName = Compiler.MainClassFullName
 
   // Could be useful in tests, depending on the trees you generate
   private val classType = irtpe.ClassType(ClassName(MainClassFullName))
