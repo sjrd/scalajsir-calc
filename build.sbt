@@ -5,7 +5,7 @@ version := "0.1-SNAPSHOT"
 scalacOptions ++= Seq(
     "-deprecation", "-feature", "-unchecked", "-encoding", "utf-8")
 
-val scalaJSVersion = "1.0.0-RC2"
+val scalaJSVersion = "1.0.1"
 
 libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value,
